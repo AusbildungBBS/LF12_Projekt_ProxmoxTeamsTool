@@ -1,0 +1,59 @@
+services:
+  bridge:
+    build:
+      context: .
+      dockerfile: bridge/Dockerfile
+    image: pttool/bridge:dev
+    container_name: pttool-bridge
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "3001:3001"
+    # When fronting with the cloudflared tunnel below, remove the host port
+    # mapping above — the bridge stays reachable only via the tunnel + the
+    # internal compose network.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  # ── Cloudflare Tunnel (optional, production deployment) ──────────────────
+  # Exposes the bridge to the internet without opening any inbound ports on
+  # the host. cloudflared opens an OUTBOUND connection to Cloudflare; the
+  # public hostname is configured in the Cloudflare Zero Trust dashboard and
+  # points at the in-compose hostname `bridge:3001`.
+  #
+  # Setup:
+  #   1. Cloudflare Dashboard → Zero Trust → Networks → Tunnels → Create
+  #      → copy the tunnel token into .env as CF_TUNNEL_TOKEN
+  #   2. In the dashboard, add a public hostname routing to http://bridge:3001
+  #   3. Remove the `ports` mapping on the bridge service above (don't expose
+  #      it to the host network — let the tunnel be the only ingress)
+  #
+  # tunnel:
+  #   image: cloudflare/cloudflared:latest
+  #   container_name: pttool-tunnel
+  #   restart: unless-stopped
+  #   command: tunnel --no-autoupdate run --token ${CF_TUNNEL_TOKEN}
+  #   depends_on:
+  #     - bridge
+
+  # ── Frontend (optional, static hosting in prod) ──────────────────────────
+  # Frontend is intended for static hosting (Azure Static Web Apps / Pages /
+  # Vercel) in production and gets installed as a Teams app via manifest.
+  # Uncomment below to also build/serve it locally inside the same Compose
+  # network — you'll need an nginx.conf and Dockerfile.frontend first.
+  #
+  # frontend:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile.frontend
+  #   image: pttool/frontend:dev
+  #   container_name: pttool-frontend
+  #   restart: unless-stopped
+  #   ports:
+  #     - "8080:80"
+  #   depends_on:
+  #     - bridge

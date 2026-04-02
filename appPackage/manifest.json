@@ -1,0 +1,40 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.20/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.20",
+  "version": "0.1.0",
+  "id": "{{AZURE_CLIENT_ID}}",
+  "developer": {
+    "name": "LF12 Projekt Team",
+    "websiteUrl": "https://localhost:5173",
+    "privacyUrl": "https://localhost:5173/privacy",
+    "termsOfUseUrl": "https://localhost:5173/terms"
+  },
+  "name": {
+    "short": "Proxmox Teams Tool",
+    "full": "Proxmox Management Tool for Microsoft Teams"
+  },
+  "description": {
+    "short": "Manage Proxmox VE from Microsoft Teams",
+    "full": "A Microsoft Teams tab application for managing Proxmox Virtual Environment instances directly from Teams."
+  },
+  "icons": {
+    "outline": "outline.png",
+    "color": "color.png"
+  },
+  "accentColor": "#4A90D9",
+  "staticTabs": [
+    {
+      "entityId": "dashboard",
+      "name": "Dashboard",
+      "contentUrl": "https://localhost:5173",
+      "websiteUrl": "https://localhost:5173",
+      "scopes": ["personal"]
+    }
+  ],
+  "permissions": ["identity", "messageTeamMembers"],
+  "validDomains": ["localhost:5173", "localhost:3001"],
+  "webApplicationInfo": {
+    "id": "{{AZURE_CLIENT_ID}}",
+    "resource": "api://localhost:5173/{{AZURE_CLIENT_ID}}"
+  }
+}
