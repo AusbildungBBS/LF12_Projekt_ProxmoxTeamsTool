@@ -47,7 +47,7 @@ export const msalConfig: Configuration = {
  * The frontend requests a token for THIS scope. The backend then exchanges
  * it via the On-Behalf-Of flow for a Microsoft Graph token.
  */
-const apiScope = `api://localhost:5173/${
+const apiScope = `api://${
   import.meta.env.VITE_AZURE_CLIENT_ID || ""
 }/access_as_user`;
 

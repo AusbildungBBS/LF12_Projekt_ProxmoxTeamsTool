@@ -13,6 +13,13 @@ const CLIENT_ID = process.env.AZURE_CLIENT_ID || process.env.VITE_AZURE_CLIENT_I
 const CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET;
 const API_AUDIENCE = process.env.API_AUDIENCE;
 
+// AUTH_MODE: standard | edu | auto (default). Controls how the bridge derives
+// roles + classes for a user. See docs/entra-setup.md → "Tenant-Typ wählen".
+const AUTH_MODE = (process.env.AUTH_MODE ?? "auto").toLowerCase() as
+  | "standard"
+  | "edu"
+  | "auto";
+
 if (!TENANT_ID || !CLIENT_ID) {
   console.warn(
     "[bridge] Missing AZURE_TENANT_ID / AZURE_CLIENT_ID — token validation will fail until set."
@@ -52,11 +59,32 @@ export interface BridgeClaims extends JwtPayload {
   roles?: string[];
   groups?: string[];
   scp?: string;
+  _claim_names?: { groups?: string };
+  _claim_sources?: Record<string, { endpoint?: string }>;
+}
+
+export type AppRole = "Proxmox.Admin" | "Proxmox.Teacher" | "Proxmox.Student";
+
+export interface BridgeIdentity {
+  oid: string;
+  name: string;
+  email: string;
+  roles: AppRole[];
+  classes: string[];
+  source: "standard" | "edu";
 }
 
 function verifyToken(token: string): Promise<BridgeClaims> {
   return new Promise((resolve, reject) => {
-    const audience = API_AUDIENCE || (CLIENT_ID ? `api://${CLIENT_ID}` : undefined);
+    // v1 tokens carry `aud: api://<client-id>`, v2 tokens carry `aud: <client-id>`.
+    // Accept both so the bridge works regardless of the App Registration's
+    // `requestedAccessTokenVersion` setting. Override with API_AUDIENCE if a
+    // custom Application ID URI is configured in Entra.
+    const audience = API_AUDIENCE
+      ? [API_AUDIENCE]
+      : CLIENT_ID
+        ? [`api://${CLIENT_ID}`, CLIENT_ID]
+        : undefined;
     const issuer = `https://login.microsoftonline.com/${TENANT_ID}/v2.0`;
     jwt.verify(
       token,
@@ -108,6 +136,41 @@ async function requireAuth(
   }
 }
 
+// ── Group Membership Resolution ────────────────────────────────────────────────
+
+const GROUP_CACHE_TTL_MS = 10 * 60 * 1000;
+const groupCache = new Map<string, { groups: string[]; expiresAt: number }>();
+
+// Overage: when a user is in >150 groups Entra drops the `groups` array and
+// sets `_claim_names.groups` instead — then we have to fetch via Graph.
+async function getUserGroups(
+  claims: BridgeClaims,
+  graphToken: string
+): Promise<string[]> {
+  if (Array.isArray(claims.groups)) return claims.groups;
+  if (!claims._claim_names?.groups || !claims.oid) return [];
+
+  const cached = groupCache.get(claims.oid);
+  if (cached && cached.expiresAt > Date.now()) return cached.groups;
+
+  const response = await axios.post(
+    "https://graph.microsoft.com/v1.0/me/getMemberGroups",
+    { securityEnabledOnly: false },
+    {
+      headers: {
+        Authorization: `Bearer ${graphToken}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+  const groups: string[] = response.data.value ?? [];
+  groupCache.set(claims.oid, {
+    groups,
+    expiresAt: Date.now() + GROUP_CACHE_TTL_MS,
+  });
+  return groups;
+}
+
 // ── On-Behalf-Of Helper ────────────────────────────────────────────────────────
 
 async function exchangeForGraphToken(userToken: string): Promise<string> {
@@ -131,6 +194,120 @@ async function exchangeForGraphToken(userToken: string): Promise<string> {
   return response.data.access_token;
 }
 
+// ── Identity Resolver (standard / edu / auto) ──────────────────────────────────
+
+const MODE_CACHE_TTL_MS = 60 * 60 * 1000;
+const modeCache = new Map<string, { mode: "standard" | "edu"; expiresAt: number }>();
+
+async function detectMode(
+  graphToken: string,
+  oid: string
+): Promise<"standard" | "edu"> {
+  if (AUTH_MODE === "standard" || AUTH_MODE === "edu") return AUTH_MODE;
+
+  const cached = modeCache.get(oid);
+  if (cached && cached.expiresAt > Date.now()) return cached.mode;
+
+  let mode: "standard" | "edu";
+  try {
+    await axios.get("https://graph.microsoft.com/v1.0/education/me", {
+      headers: { Authorization: `Bearer ${graphToken}` },
+    });
+    mode = "edu";
+  } catch (e) {
+    // 403/404 → tenant lacks EDU or user has no EDU profile → standard path.
+    // Any other error is propagated so we don't silently mis-classify.
+    if (axios.isAxiosError(e) && (e.response?.status === 403 || e.response?.status === 404)) {
+      mode = "standard";
+    } else {
+      throw e;
+    }
+  }
+
+  modeCache.set(oid, { mode, expiresAt: Date.now() + MODE_CACHE_TTL_MS });
+  console.log(`[bridge] identity mode for ${oid}: ${mode}`);
+  return mode;
+}
+
+function mapEduRoleToAppRoles(primaryRole?: string): AppRole[] {
+  switch (primaryRole) {
+    case "teacher":
+    case "faculty":
+      return ["Proxmox.Teacher"];
+    case "student":
+      return ["Proxmox.Student"];
+    default:
+      return [];
+  }
+}
+
+function filterAppRoles(roles: string[] | undefined): AppRole[] {
+  if (!roles) return [];
+  const allowed: AppRole[] = ["Proxmox.Admin", "Proxmox.Teacher", "Proxmox.Student"];
+  return roles.filter((r): r is AppRole => allowed.includes(r as AppRole));
+}
+
+async function resolveFromStandard(
+  claims: BridgeClaims,
+  graphToken: string
+): Promise<BridgeIdentity> {
+  return {
+    oid: claims.oid!,
+    name: claims.name ?? "",
+    email: claims.preferred_username ?? "",
+    roles: filterAppRoles(claims.roles),
+    classes: await getUserGroups(claims, graphToken),
+    source: "standard",
+  };
+}
+
+// EDU path — untested without an EDU tenant. Built against Microsoft Graph
+// Education docs. When an EDU tenant becomes available, verify primaryRole values
+// and the $expand=group response shape.
+async function resolveFromEdu(
+  claims: BridgeClaims,
+  graphToken: string
+): Promise<BridgeIdentity> {
+  const userRes = await axios.get(
+    "https://graph.microsoft.com/v1.0/education/me/user?$select=primaryRole",
+    { headers: { Authorization: `Bearer ${graphToken}` } }
+  );
+  const eduRoles = mapEduRoleToAppRoles(userRes.data?.primaryRole);
+
+  const classesRes = await axios.get(
+    "https://graph.microsoft.com/v1.0/education/me/classes?$expand=group($select=id)&$select=id,displayName",
+    { headers: { Authorization: `Bearer ${graphToken}` } }
+  );
+  const classes: string[] = (classesRes.data?.value ?? [])
+    .map((c: { group?: { id?: string } }) => c.group?.id)
+    .filter((id: string | undefined): id is string => typeof id === "string");
+
+  // Admin role is never in EDU's primaryRole — it stays an explicit App Role.
+  // Union of EDU-derived + explicit App Roles from the token.
+  const explicitAppRoles = filterAppRoles(claims.roles);
+  const roles = Array.from(new Set([...eduRoles, ...explicitAppRoles]));
+
+  return {
+    oid: claims.oid!,
+    name: claims.name ?? "",
+    email: claims.preferred_username ?? "",
+    roles,
+    classes,
+    source: "edu",
+  };
+}
+
+async function resolveIdentity(
+  claims: BridgeClaims,
+  graphToken: string
+): Promise<BridgeIdentity> {
+  if (!claims.oid) throw new Error("Token missing oid claim");
+  const mode = await detectMode(graphToken, claims.oid);
+  return mode === "edu"
+    ? resolveFromEdu(claims, graphToken)
+    : resolveFromStandard(claims, graphToken);
+}
+
 // ── Routes ─────────────────────────────────────────────────────────────────────
 
 app.get("/api/health", (_req, res) => {
@@ -143,11 +320,11 @@ app.get("/api/me", requireAuth, async (req, res) => {
     const profile = await axios.get("https://graph.microsoft.com/v1.0/me", {
       headers: { Authorization: `Bearer ${graphToken}` },
     });
+    const identity = await resolveIdentity(req.user!, graphToken);
 
     res.json({
       profile: profile.data,
-      roles: req.user!.roles ?? [],
-      groups: req.user!.groups ?? [],
+      identity,
     });
   } catch (error: unknown) {
     console.error("/api/me failed:", error);
@@ -163,6 +340,78 @@ app.get("/api/me", requireAuth, async (req, res) => {
       });
     }
   }
+});
+
+// Temporary debug endpoint — shows resolved BridgeIdentity plus which mode
+// produced it. Useful to verify EDU vs. standard detection. Gate before shipping.
+app.get("/api/debug/identity", requireAuth, async (req, res) => {
+  try {
+    const graphToken = await exchangeForGraphToken(req.rawToken!);
+    const identity = await resolveIdentity(req.user!, graphToken);
+    res.json({ authMode: AUTH_MODE, identity });
+  } catch (e) {
+    res.status(500).json({
+      error: "identity resolution failed",
+      message: e instanceof Error ? e.message : String(e),
+    });
+  }
+});
+
+// Temporary sanity-check endpoint — always goes via Graph regardless of the
+// `groups`-claim. Remove or gate behind NODE_ENV !== "production" before shipping.
+app.get("/api/debug/groups", requireAuth, async (req, res) => {
+  const graphToken = await exchangeForGraphToken(req.rawToken!);
+
+  const tryCall = async <T,>(fn: () => Promise<T>): Promise<T | { error: unknown }> => {
+    try {
+      return await fn();
+    } catch (e) {
+      return {
+        error: axios.isAxiosError(e)
+          ? { status: e.response?.status, body: e.response?.data }
+          : e instanceof Error
+            ? e.message
+            : String(e),
+      };
+    }
+  };
+
+  const memberOf = await tryCall(async () => {
+    const r = await axios.get(
+      "https://graph.microsoft.com/v1.0/me/memberOf?$select=id,displayName,description,groupTypes,securityEnabled,mailEnabled,visibility",
+      { headers: { Authorization: `Bearer ${graphToken}` } }
+    );
+    return r.data;
+  });
+
+  const transitiveMemberOf = await tryCall(async () => {
+    const r = await axios.get(
+      "https://graph.microsoft.com/v1.0/me/transitiveMemberOf?$select=id,displayName,groupTypes",
+      { headers: { Authorization: `Bearer ${graphToken}` } }
+    );
+    return r.data;
+  });
+
+  const getMemberGroups = await tryCall(async () => {
+    const r = await axios.post(
+      "https://graph.microsoft.com/v1.0/me/getMemberGroups",
+      { securityEnabledOnly: false },
+      {
+        headers: {
+          Authorization: `Bearer ${graphToken}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+    return r.data;
+  });
+
+  res.json({
+    claimGroups: req.user!.groups ?? null,
+    memberOf,
+    transitiveMemberOf,
+    getMemberGroups,
+  });
 });
 
 app.listen(PORT, () => {
