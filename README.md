@@ -5,8 +5,10 @@ Microsoft-Teams-Tab, mit dem Lehrer Schülern Proxmox-VE-VMs aus Templates zur V
 > **Status:** frühe Konzeptphase. Frontend + Auth-Gerüst + Bridge-Skeleton mit JWT-Validierung stehen. Die Anbindung an Proxmox ist als Interface deklariert, aber noch nicht implementiert — siehe [Roadmap](#roadmap).
 
 Mehr Details:
-- **Architektur:** [KONZEPT.md](KONZEPT.md)
+- **Setup-Anleitung (Onboarding):** [docs/setup.md](docs/setup.md)
+- **Entra-App-Registrierung (Pflicht für Login):** [docs/entra-setup.md](docs/entra-setup.md)
 - **Proxmox-Dev-Setup (Hyper-V) + API-Pointer:** [docs/proxmox-dev-setup.md](docs/proxmox-dev-setup.md)
+- **Architektur:** [KONZEPT.md](KONZEPT.md)
 
 ---
 
@@ -82,6 +84,7 @@ Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-Variablen tragen
 | `VITE_AZURE_TENANT_ID` / `AZURE_TENANT_ID` | Tenant ID |
 | `AZURE_CLIENT_SECRET` | Client Secret (Bridge-seitig für OBO-Token-Exchange) |
 | `API_AUDIENCE` | Erwartete `aud` der eingehenden Tokens (default: `api://<AZURE_CLIENT_ID>`) |
+| `AUTH_MODE` | `standard` / `edu` / `auto` (Default). Steuert, ob Rollen + Klassen aus App-Roles + `groups`-Claim (Standard) oder aus Microsoft Education Graph (EDU) kommen. Details: [docs/entra-setup.md](docs/entra-setup.md). |
 | `PROXMOX_URL` / `PROXMOX_TOKEN_ID` / `PROXMOX_TOKEN_SECRET` | Proxmox-Anbindung — kommt mit der Implementation des `ProxmoxClient` |
 | `CF_TUNNEL_TOKEN` | Optional, wenn Cloudflare-Tunnel-Service in Compose aktiviert wird |
 

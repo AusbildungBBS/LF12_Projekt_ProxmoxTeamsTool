@@ -110,17 +110,35 @@ Pro eingehendem Request:
 
 ## Klassen
 
-**Entschieden:** Eine **M365-Group pro Klasse**, *kein* EDU-Plan an der Schule.
+**Entschieden:** Eine **M365-Group pro Klasse**. Die Bridge unterstützt zwei Wege, an Rollen + Klassenzugehörigkeit zu kommen — gewählt via `AUTH_MODE` (s. u.).
 
-- Group-OID = `class-id` (landet auch als `tpl-class:<group-oid>` in den Proxmox-Tags).
+- Group-OID = `class-id` (landet auch als `tpl-class:<group-oid>` in den Proxmox-Tags) — **identisch in beiden Modi**, sodass die Proxmox-Tags und VM-Logic mode-agnostisch bleiben.
+
+### Modus `standard` (Plain M365, kein EDU)
+- Klassen werden manuell als M365-Group im Tenant angelegt.
 - **Lehrer und Schüler sind beide ganz normale Mitglieder** derselben Group — innerhalb der Group nicht unterscheidbar.
-- Die Lehrer/Schüler-Differenzierung kommt **ausschließlich aus der App Role** (`Proxmox.Teacher` vs. `Proxmox.Student`) im Token-Claim.
+- Lehrer/Schüler-Differenzierung kommt **ausschließlich aus der App Role** (`Proxmox.Teacher` vs. `Proxmox.Student`) im Token-Claim, manuell pro User in Entra zugewiesen.
 - „Lehrer Müller ist Lehrer der Klasse 12a" = `App Role == Teacher` **UND** `User ∈ Group(12a)`. Beide Bedingungen prüft die Bridge.
 - Schüler analog: `App Role == Student` **UND** `User ∈ Group(12a)`.
 
+### Modus `edu` (Teams for Education / School Data Sync)
+- Falls der Tenant EDU-licensed ist und der Admin `EduRoster.ReadBasic` für unsere App freigibt: die Bridge zieht Rollen + Klassen aus dem Education Graph.
+- **Roles:** `primaryRole` aus `/education/me/user` → mapped (`teacher`/`faculty` → `Proxmox.Teacher`, `student` → `Proxmox.Student`). `Proxmox.Admin` bleibt eine zusätzliche manuelle App-Role.
+- **Klassen:** `/education/me/classes?$expand=group` → `group.id` (= Group-OID der unter dem EDU-Class-Objekt liegenden M365-Group).
+- Vorteil: keine Per-User-Pflege in Entra mehr — Teacher/Student/Klassen kommen aus dem SDS-Sync vom Schulverwaltungssystem.
+- Implementiert in [bridge/index.ts → `resolveFromEdu`](bridge/index.ts) — **untested without an EDU tenant**, defensiv gegen die Microsoft-Docs gebaut.
+
+### Modus `auto` (Default)
+- Bridge probiert beim ersten Request pro User-OID `GET /education/me`.
+  - 200 → User wird als EDU-User behandelt.
+  - 403 (kein Consent) / 404 (kein EDU im Tenant) → Standard-Modus.
+- Ergebnis 1 h pro OID gecached, damit der Probe-Call nicht pro Request fällt.
+- Ein und derselbe Bridge-Build funktioniert so in beiden Tenant-Typen ohne Deploy-Anpassung.
+
 ### Wie die Bridge an die Mitgliedschaft kommt
-- **Bevorzugt:** `groups`-Claim direkt im Access-Token (in Entra konfigurierbar — Token Configuration → Groups Claim). Spart pro Request einen Graph-Call. Achtung: bei >~200 Group-Memberships schaltet Entra auf einen „overage"-Claim um und man muss doch über Graph nachladen — für Schüler praktisch kein Thema, für Lehrer mit vielen Klassen evtl. doch.
-- **Fallback / wenn Graph eh nötig:** Bridge fragt per OBO + `/me/memberOf` oder `/me/transitiveMemberOf` ab und cached pro Session.
+- **Primärquelle:** `groups`-Claim direkt im Access-Token (in Entra: Token configuration → Groups claim → „All groups", Format Group ID). Spart pro Request einen Graph-Call. Implementiert in [bridge/index.ts → `getUserGroups`](bridge/index.ts).
+- **Overage-Fallback:** Bei >150 Group-Memberships schaltet Entra die `groups`-Array auf einen `_claim_names`-Pointer um — dann fetcht die Bridge via OBO + `POST /v1.0/me/getMemberGroups` und cached das Ergebnis pro User-OID 10 min in-memory. Für Schüler praktisch kein Thema, für Lehrer mit vielen Klassen + Tenant-Groups evtl. doch.
+- **Filterung in der Bridge:** Bei „All groups" landen auch nicht-Klassen-Groups (Security-/Distribution-Groups) im Token. Wir whitelisten serverseitig über die Klassen-Tags in Proxmox (`tpl-class:<oid>`) — alles, was dort nicht referenziert ist, wird ignoriert.
 
 ### Pflege der Klassen
 - Liegt komplett im Tenant: Klassen-Group anlegen, Lehrer + Schüler hinzufügen — fertig. Kann über Schulverwaltung/IT/Teams-Admin laufen, **wir bauen dafür kein eigenes UI**.
