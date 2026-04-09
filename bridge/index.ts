@@ -342,77 +342,79 @@ app.get("/api/me", requireAuth, async (req, res) => {
   }
 });
 
-// Temporary debug endpoint — shows resolved BridgeIdentity plus which mode
-// produced it. Useful to verify EDU vs. standard detection. Gate before shipping.
-app.get("/api/debug/identity", requireAuth, async (req, res) => {
-  try {
-    const graphToken = await exchangeForGraphToken(req.rawToken!);
-    const identity = await resolveIdentity(req.user!, graphToken);
-    res.json({ authMode: AUTH_MODE, identity });
-  } catch (e) {
-    res.status(500).json({
-      error: "identity resolution failed",
-      message: e instanceof Error ? e.message : String(e),
-    });
-  }
-});
-
-// Temporary sanity-check endpoint — always goes via Graph regardless of the
-// `groups`-claim. Remove or gate behind NODE_ENV !== "production" before shipping.
-app.get("/api/debug/groups", requireAuth, async (req, res) => {
-  const graphToken = await exchangeForGraphToken(req.rawToken!);
-
-  const tryCall = async <T,>(fn: () => Promise<T>): Promise<T | { error: unknown }> => {
+// Debug endpoints — only registered outside production. Dockerfile sets
+// NODE_ENV=production for shipped builds, so they're auto-gated.
+if (process.env.NODE_ENV !== "production") {
+  app.get("/api/debug/identity", requireAuth, async (req, res) => {
     try {
-      return await fn();
+      const graphToken = await exchangeForGraphToken(req.rawToken!);
+      const identity = await resolveIdentity(req.user!, graphToken);
+      res.json({ authMode: AUTH_MODE, identity });
     } catch (e) {
-      return {
-        error: axios.isAxiosError(e)
-          ? { status: e.response?.status, body: e.response?.data }
-          : e instanceof Error
-            ? e.message
-            : String(e),
-      };
+      res.status(500).json({
+        error: "identity resolution failed",
+        message: e instanceof Error ? e.message : String(e),
+      });
     }
-  };
-
-  const memberOf = await tryCall(async () => {
-    const r = await axios.get(
-      "https://graph.microsoft.com/v1.0/me/memberOf?$select=id,displayName,description,groupTypes,securityEnabled,mailEnabled,visibility",
-      { headers: { Authorization: `Bearer ${graphToken}` } }
-    );
-    return r.data;
   });
 
-  const transitiveMemberOf = await tryCall(async () => {
-    const r = await axios.get(
-      "https://graph.microsoft.com/v1.0/me/transitiveMemberOf?$select=id,displayName,groupTypes",
-      { headers: { Authorization: `Bearer ${graphToken}` } }
-    );
-    return r.data;
-  });
+  app.get("/api/debug/groups", requireAuth, async (req, res) => {
+    const graphToken = await exchangeForGraphToken(req.rawToken!);
 
-  const getMemberGroups = await tryCall(async () => {
-    const r = await axios.post(
-      "https://graph.microsoft.com/v1.0/me/getMemberGroups",
-      { securityEnabledOnly: false },
-      {
-        headers: {
-          Authorization: `Bearer ${graphToken}`,
-          "Content-Type": "application/json",
-        },
+    const tryCall = async <T,>(fn: () => Promise<T>): Promise<T | { error: unknown }> => {
+      try {
+        return await fn();
+      } catch (e) {
+        return {
+          error: axios.isAxiosError(e)
+            ? { status: e.response?.status, body: e.response?.data }
+            : e instanceof Error
+              ? e.message
+              : String(e),
+        };
       }
-    );
-    return r.data;
+    };
+
+    const memberOf = await tryCall(async () => {
+      const r = await axios.get(
+        "https://graph.microsoft.com/v1.0/me/memberOf?$select=id,displayName,description,groupTypes,securityEnabled,mailEnabled,visibility",
+        { headers: { Authorization: `Bearer ${graphToken}` } }
+      );
+      return r.data;
+    });
+
+    const transitiveMemberOf = await tryCall(async () => {
+      const r = await axios.get(
+        "https://graph.microsoft.com/v1.0/me/transitiveMemberOf?$select=id,displayName,groupTypes",
+        { headers: { Authorization: `Bearer ${graphToken}` } }
+      );
+      return r.data;
+    });
+
+    const getMemberGroups = await tryCall(async () => {
+      const r = await axios.post(
+        "https://graph.microsoft.com/v1.0/me/getMemberGroups",
+        { securityEnabledOnly: false },
+        {
+          headers: {
+            Authorization: `Bearer ${graphToken}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+      return r.data;
+    });
+
+    res.json({
+      claimGroups: req.user!.groups ?? null,
+      memberOf,
+      transitiveMemberOf,
+      getMemberGroups,
+    });
   });
 
-  res.json({
-    claimGroups: req.user!.groups ?? null,
-    memberOf,
-    transitiveMemberOf,
-    getMemberGroups,
-  });
-});
+  console.log("[bridge] debug endpoints enabled at /api/debug/* (NODE_ENV != production)");
+}
 
 app.listen(PORT, () => {
   console.log(`[bridge] listening on http://localhost:${PORT}`);

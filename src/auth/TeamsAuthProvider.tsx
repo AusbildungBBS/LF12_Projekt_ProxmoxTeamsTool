@@ -20,13 +20,24 @@ export interface GraphProfile {
   officeLocation?: string | null;
 }
 
+export interface BridgeIdentity {
+  oid: string;
+  name: string;
+  email: string;
+  roles: string[];
+  classes: string[];
+  source: "standard" | "edu";
+}
+
 interface AuthContextType {
   isInTeams: boolean;
   isAuthenticated: boolean;
   user: AccountInfo | null;
   accessToken: string | null;
   profile: GraphProfile | null;
+  identity: BridgeIdentity | null;
   roles: string[];
+  classes: string[];
   hasRole: (role: string) => boolean;
   login: () => Promise<void>;
   logout: () => Promise<void>;
@@ -41,7 +52,9 @@ export const AuthContext = createContext<AuthContextType>({
   user: null,
   accessToken: null,
   profile: null,
+  identity: null,
   roles: [],
+  classes: [],
   hasRole: () => false,
   login: async () => {},
   logout: async () => {},
@@ -63,16 +76,20 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const [isInTeams, setIsInTeams] = useState(false);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [profile, setProfile] = useState<GraphProfile | null>(null);
+  const [identity, setIdentity] = useState<BridgeIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const user = accounts[0] ?? null;
   const isAuthenticated = !!user;
 
-  const idTokenClaims = user?.idTokenClaims as
-    | { roles?: string[] }
-    | undefined;
-  const roles = idTokenClaims?.roles ?? [];
+  // Roles come from the bridge-resolved identity (works for both standard and
+  // edu auth modes). Fall back to ID-token roles while /api/me is still loading,
+  // so the UI doesn't flash an empty role between login and first response.
+  const idTokenRoles =
+    (user?.idTokenClaims as { roles?: string[] } | undefined)?.roles ?? [];
+  const roles = identity?.roles ?? idTokenRoles;
+  const classes = identity?.classes ?? [];
   const hasRole = (role: string) => roles.includes(role);
 
   // Detect if running inside Teams
@@ -120,10 +137,11 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       });
   }, [user, accessToken, instance]);
 
-  // Once we have an access token, fetch profile + roles from the backend
+  // Once we have an access token, fetch profile + identity from the backend
   useEffect(() => {
     if (!accessToken) {
       setProfile(null);
+      setIdentity(null);
       return;
     }
     let cancelled = false;
@@ -137,7 +155,10 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
           return;
         }
         const data = await res.json();
-        if (!cancelled) setProfile(data.profile ?? null);
+        if (!cancelled) {
+          setProfile(data.profile ?? null);
+          setIdentity(data.identity ?? null);
+        }
       } catch (err) {
         console.error("Failed to fetch /api/me:", err);
       }
@@ -228,7 +249,9 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         user,
         accessToken,
         profile,
+        identity,
         roles,
+        classes,
         hasRole,
         login,
         logout,

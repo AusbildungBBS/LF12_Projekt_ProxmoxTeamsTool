@@ -1,5 +1,9 @@
 import type { ReactNode } from "react";
-import { AuthContext, type GraphProfile } from "./TeamsAuthProvider";
+import {
+  AuthContext,
+  type GraphProfile,
+  type BridgeIdentity,
+} from "./TeamsAuthProvider";
 import type { AccountInfo } from "@azure/msal-browser";
 
 // Dev-only auth bypass. Enabled via:
@@ -75,6 +79,12 @@ const FAKE_PROFILES: Record<DevRole, GraphProfile> = {
   },
 };
 
+const FAKE_CLASSES: Record<DevRole, string[]> = {
+  admin: [],
+  teacher: ["dev-class-12a", "dev-class-12b"],
+  student: ["dev-class-12a"],
+};
+
 export function DevFakeAuthProvider({
   role,
   children,
@@ -84,6 +94,16 @@ export function DevFakeAuthProvider({
 }) {
   const roles = [ROLE_CLAIM_MAP[role]];
   const profile = FAKE_PROFILES[role];
+  const classes = FAKE_CLASSES[role];
+
+  const identity: BridgeIdentity = {
+    oid: profile.id,
+    name: profile.displayName,
+    email: profile.userPrincipalName,
+    roles,
+    classes,
+    source: "standard",
+  };
 
   const fakeUser = {
     homeAccountId: profile.id,
@@ -102,7 +122,9 @@ export function DevFakeAuthProvider({
         user: fakeUser,
         accessToken: "dev-fake-token",
         profile,
+        identity,
         roles,
+        classes,
         hasRole: (r: string) => roles.includes(r),
         login: async () => {},
         logout: async () => {
