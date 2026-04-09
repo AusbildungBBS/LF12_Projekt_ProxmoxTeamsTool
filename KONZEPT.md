@@ -70,16 +70,16 @@ Proxmox-Tags sind plain strings ohne Key/Value. Konvention: `prefix:value`.
 | Tag | Bedeutung |
 |---|---|
 | `pttool` | Marker: vom Tool verwaltet (Discovery/Filter) |
-| `owner:<user-oid>` | Schüler, dem die VM gehört |
-| `tpl:<template-id>` | Aus welchem Template erstellt (für „Recreate") |
+| `vm-owner-<user-oid>` | Schüler, dem die VM gehört |
+| `vm-tpl-<template-id>` | Aus welchem Template erstellt (für „Recreate") |
 
 ### Template-Tags (Proxmox-VM-Templates)
 | Tag | Bedeutung |
 |---|---|
 | `pttool-tpl` | Marker: ein vom Tool nutzbares Template |
-| `tpl-owner:<teacher-oid>` | Ersteller (Lehrer) |
+| `tpl-owner-<teacher-oid>` | Ersteller (Lehrer) |
 | `tpl-public` | Public-Flag — andere Lehrer dürfen es zuweisen |
-| `tpl-class:<class-id>` | Klassenzuweisung (mehrfach möglich → m:n) |
+| `tpl-class-<class-id>` | Klassenzuweisung (mehrfach möglich → m:n) |
 
 **Vorteil:** Keine separate DB. Proxmox bleibt Single Source of Truth. Backups/Snapshots des Proxmox-Clusters enthalten automatisch das Domänenmodell.
 
@@ -99,7 +99,7 @@ Pro eingehendem Request:
 | Rolle | Darf |
 |---|---|
 | Admin | alles |
-| Teacher | Templates erstellen; eigene Templates oder `tpl-public` als `tpl-class:<seine-klasse>` zuweisen/entziehen; VMs in seinen Klassen sehen + start/stop/delete |
+| Teacher | Templates erstellen; eigene Templates oder `tpl-public` als `tpl-class-<seine-klasse>` zuweisen/entziehen; VMs in seinen Klassen sehen + start/stop/delete |
 | Student | aus zugewiesenen Templates **eine** VM pro Template erstellen; nur eigene VMs (`owner == self`) start/stop/delete/recreate |
 
 5. **Erlauben** → Proxmox-Call durchreichen. **Verweigern** → 403.
@@ -112,7 +112,7 @@ Pro eingehendem Request:
 
 **Entschieden:** Eine **M365-Group pro Klasse**. Die Bridge unterstützt zwei Wege, an Rollen + Klassenzugehörigkeit zu kommen — gewählt via `AUTH_MODE` (s. u.).
 
-- Group-OID = `class-id` (landet auch als `tpl-class:<group-oid>` in den Proxmox-Tags) — **identisch in beiden Modi**, sodass die Proxmox-Tags und VM-Logic mode-agnostisch bleiben.
+- Group-OID = `class-id` (landet auch als `tpl-class-<group-oid>` in den Proxmox-Tags) — **identisch in beiden Modi**, sodass die Proxmox-Tags und VM-Logic mode-agnostisch bleiben.
 
 ### Modus `standard` (Plain M365, kein EDU)
 - Klassen werden manuell als M365-Group im Tenant angelegt.
@@ -138,7 +138,7 @@ Pro eingehendem Request:
 ### Wie die Bridge an die Mitgliedschaft kommt
 - **Primärquelle:** `groups`-Claim direkt im Access-Token (in Entra: Token configuration → Groups claim → „All groups", Format Group ID). Spart pro Request einen Graph-Call. Implementiert in [bridge/index.ts → `getUserGroups`](bridge/index.ts).
 - **Overage-Fallback:** Bei >150 Group-Memberships schaltet Entra die `groups`-Array auf einen `_claim_names`-Pointer um — dann fetcht die Bridge via OBO + `POST /v1.0/me/getMemberGroups` und cached das Ergebnis pro User-OID 10 min in-memory. Für Schüler praktisch kein Thema, für Lehrer mit vielen Klassen + Tenant-Groups evtl. doch.
-- **Filterung in der Bridge:** Bei „All groups" landen auch nicht-Klassen-Groups (Security-/Distribution-Groups) im Token. Wir whitelisten serverseitig über die Klassen-Tags in Proxmox (`tpl-class:<oid>`) — alles, was dort nicht referenziert ist, wird ignoriert. Implementiert in [bridge/classes.ts → `filterToActiveClasses`](bridge/classes.ts); Whitelist wird einmal pro 5 min aus `cluster/resources` aggregiert. Ist `PROXMOX_URL` nicht gesetzt, läuft die Bridge ohne Filter (Dev-Fallback).
+- **Filterung in der Bridge:** Bei „All groups" landen auch nicht-Klassen-Groups (Security-/Distribution-Groups) im Token. Wir whitelisten serverseitig über die Klassen-Tags in Proxmox (`tpl-class-<oid>`) — alles, was dort nicht referenziert ist, wird ignoriert. Implementiert in [bridge/classes.ts → `filterToActiveClasses`](bridge/classes.ts); Whitelist wird einmal pro 5 min aus `cluster/resources` aggregiert. Ist `PROXMOX_URL` nicht gesetzt, läuft die Bridge ohne Filter (Dev-Fallback).
 
 ### Pflege der Klassen
 - Liegt komplett im Tenant: Klassen-Group anlegen, Lehrer + Schüler hinzufügen — fertig. Kann über Schulverwaltung/IT/Teams-Admin laufen, **wir bauen dafür kein eigenes UI**.

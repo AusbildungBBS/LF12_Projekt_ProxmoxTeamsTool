@@ -96,7 +96,7 @@ Klassen kommen aus M365-Group-Memberships. Damit die Bridge das ohne separaten G
 1. Linke Sidebar → **Token configuration → Add groups claim**
 2. **Welche Groups:** Empfehlung **„All groups (incl. SecurityGroups, DirectoryRoles, DistributionLists)"** ankreuzen — das funktioniert auf jedem Lizenztier. Die Alternative *„Groups assigned to the application"* wäre sauberer (nur Klassen-Groups landen im Token), setzt aber **Azure AD P1** voraus, weil Free-/Office-365-Tier keine Group-Assignments an Enterprise Apps erlaubt.
 3. Format: **Group ID** (Object-ID der Group). Passt zum Domänenmodell (Group-OID = `class-id`, siehe [KONZEPT.md](../KONZEPT.md)).
-4. Bei „All groups": Bridge muss serverseitig filtern auf Klassen-Groups (Proxmox-Tag `tpl-class:<oid>` als Whitelist). Der Token enthält dann Security-Groups, Distribution Lists usw. — alles, was wir nicht in einer der `tpl-class`-Tags wiederfinden, ignorieren wir einfach.
+4. Bei „All groups": Bridge muss serverseitig filtern auf Klassen-Groups (Proxmox-Tag `tpl-class-<oid>` als Whitelist). Der Token enthält dann Security-Groups, Distribution Lists usw. — alles, was wir nicht in einer der `tpl-class`-Tags wiederfinden, ignorieren wir einfach.
 5. Speichern.
 
 **Overage-Fallback:** Bei >150 Group-Memberships ersetzt Entra die `groups`-Array durch einen `_claim_names`-Pointer. Die Bridge erkennt das in [bridge/index.ts → `getUserGroups`](../bridge/index.ts) und lädt die Memberships dann per Graph `POST /v1.0/me/getMemberGroups` nach. Das Ergebnis wird pro User-OID 10 min in einer In-Memory-Map gecacht — kein Graph-Hagel pro UI-Klick, aber neue Klassenzuweisungen werden in unter 10 min sichtbar.

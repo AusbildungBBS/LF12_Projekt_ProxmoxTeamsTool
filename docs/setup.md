@@ -121,7 +121,7 @@ Implementation: [src/auth/DevFakeAuth.tsx](../src/auth/DevFakeAuth.tsx). Greift 
 
 ## 8. Proxmox-Anbindung
 
-Sobald die Bridge eine erreichbare Proxmox-Instanz sieht, filtert sie die `classes`-Liste in der Identity gegen die Proxmox-Tag-Whitelist: nur Group-OIDs, die in mindestens einem Template als `tpl-class:<oid>` markiert sind, gelten als „aktive Klasse für dieses Tool". Ohne Proxmox-Konfig (Variablen leer) wird der Filter übersprungen und die Bridge gibt alle Memberships ungefiltert weiter — gut fürs frühe Dev-Stadium, schlecht für Prod.
+Sobald die Bridge eine erreichbare Proxmox-Instanz sieht, filtert sie die `classes`-Liste in der Identity gegen die Proxmox-Tag-Whitelist: nur Group-OIDs, die in mindestens einem Template als `tpl-class-<oid>` markiert sind, gelten als „aktive Klasse für dieses Tool". Ohne Proxmox-Konfig (Variablen leer) wird der Filter übersprungen und die Bridge gibt alle Memberships ungefiltert weiter — gut fürs frühe Dev-Stadium, schlecht für Prod.
 
 Was die Bridge erwartet (in `.env`):
 

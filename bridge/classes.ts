@@ -1,7 +1,7 @@
 import type { ProxmoxClient } from "./proxmox";
 
 // Active-class whitelist. A Group becomes a "Pttool-Klasse" by virtue of
-// at least one template in Proxmox being tagged `tpl-class:<group-oid>`.
+// at least one template in Proxmox being tagged `tpl-class-<group-oid>`.
 // Without such a tag the group is just an M365 group from the user's
 // `groups`-claim and gets filtered out — keeps "All Company" etc. out of
 // the UI even though the user is technically a member.
@@ -9,7 +9,10 @@ import type { ProxmoxClient } from "./proxmox";
 const ACTIVE_CLASS_CACHE_TTL_MS = 5 * 60 * 1000;
 let cache: { oids: Set<string>; expiresAt: number } | null = null;
 
-const TAG_PREFIX = "tpl-class:";
+// Proxmox VE 8 restricts tags to [a-z0-9_-]+ — no colons. We use `-` as the
+// key/value separator instead of `:`. OIDs are UUIDs (also containing dashes),
+// so we recognize via `startsWith(TAG_PREFIX)` and slice the prefix off.
+const TAG_PREFIX = "tpl-class-";
 
 export async function getActiveClassOids(
   client: ProxmoxClient | null

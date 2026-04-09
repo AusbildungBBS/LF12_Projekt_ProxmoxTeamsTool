@@ -85,7 +85,7 @@ Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-Variablen tragen
 | `AZURE_CLIENT_SECRET` | Client Secret (Bridge-seitig für OBO-Token-Exchange) |
 | `API_AUDIENCE` | Erwartete `aud` der eingehenden Tokens (default: `api://<AZURE_CLIENT_ID>`) |
 | `AUTH_MODE` | `standard` / `edu` / `auto` (Default). Steuert, ob Rollen + Klassen aus App-Roles + `groups`-Claim (Standard) oder aus Microsoft Education Graph (EDU) kommen. Details: [docs/entra-setup.md](docs/entra-setup.md). |
-| `PROXMOX_URL` / `PROXMOX_TOKEN_ID` / `PROXMOX_TOKEN_SECRET` | Proxmox-Anbindung. Wenn gesetzt: Bridge filtert die `classes`-Liste der Identity gegen die `tpl-class:<oid>`-Tags. Wenn leer: Filter aus (alle Group-Memberships passieren). |
+| `PROXMOX_URL` / `PROXMOX_TOKEN_ID` / `PROXMOX_TOKEN_SECRET` | Proxmox-Anbindung. Wenn gesetzt: Bridge filtert die `classes`-Liste der Identity gegen die `tpl-class-<oid>`-Tags. Wenn leer: Filter aus (alle Group-Memberships passieren). |
 | `PROXMOX_TLS_REJECT_UNAUTHORIZED` | `false` für Self-Signed-Cert (Dev). Default `true`. |
 | `CF_TUNNEL_TOKEN` | Optional, wenn Cloudflare-Tunnel-Service in Compose aktiviert wird |
 
@@ -93,7 +93,7 @@ Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-Variablen tragen
 
 ## Roadmap
 
-1. ~~**`RealProxmoxClient`**~~ — erledigt. HTTP-Wrapper mit API-Token-Auth gegen Proxmox VE 8, Klassen-Filter via `tpl-class:<oid>`-Tags. Setup-Hinweise: [docs/setup.md → Proxmox-Anbindung](docs/setup.md), Dev-VM auf Hyper-V: [docs/proxmox-dev-setup.md](docs/proxmox-dev-setup.md).
+1. ~~**`RealProxmoxClient`**~~ — erledigt. HTTP-Wrapper mit API-Token-Auth gegen Proxmox VE 8, Klassen-Filter via `tpl-class-<oid>`-Tags. Setup-Hinweise: [docs/setup.md → Proxmox-Anbindung](docs/setup.md), Dev-VM auf Hyper-V: [docs/proxmox-dev-setup.md](docs/proxmox-dev-setup.md).
 2. **Erste Bridge-Endpoints** — `GET /api/vms`, `GET /api/templates`, gefiltert nach Rolle + Klassen-Membership.
 3. **Frontend-Wiring** — die aktuell als Empty-State stehenden Seiten gegen echte Endpoints fetchen.
 4. **Teams-Manifest aktualisieren** — auf die produktive Bridge-URL.

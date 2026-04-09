@@ -5,7 +5,9 @@ import axios from "axios";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 import { createProxmoxClientFromEnv } from "./proxmox";
+import type { VM, VMID } from "./proxmox";
 import { filterToActiveClasses, clearActiveClassCache } from "./classes";
+import { TAG, tagValue, tagValues, hasTag } from "./tags";
 
 dotenv.config();
 
@@ -121,6 +123,8 @@ declare module "express-serve-static-core" {
   interface Request {
     user?: BridgeClaims;
     rawToken?: string;
+    identity?: BridgeIdentity;
+    graphToken?: string;
   }
 }
 
@@ -321,6 +325,88 @@ async function resolveIdentity(
     : resolveFromStandard(claims, graphToken);
 }
 
+// ── Identity Middleware + Authorization Helpers ────────────────────────────────
+
+async function requireIdentity(
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction
+) {
+  if (!req.rawToken) {
+    res.status(401).json({ error: "Token required" });
+    return;
+  }
+  try {
+    req.graphToken = await exchangeForGraphToken(req.rawToken);
+    req.identity = await resolveIdentity(req.user!, req.graphToken);
+    next();
+  } catch (err) {
+    console.error("[bridge] identity resolution failed:", err);
+    res.status(500).json({ error: "identity resolution failed" });
+  }
+}
+
+function isAdmin(id: BridgeIdentity): boolean {
+  return id.roles.includes("Proxmox.Admin");
+}
+function isTeacher(id: BridgeIdentity): boolean {
+  return id.roles.includes("Proxmox.Teacher");
+}
+function isStudent(id: BridgeIdentity): boolean {
+  return id.roles.includes("Proxmox.Student");
+}
+
+// Visibility — read access
+function canSeeTemplate(tpl: VM, id: BridgeIdentity): boolean {
+  if (isAdmin(id)) return true;
+  if (isTeacher(id)) {
+    if (tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX) === id.oid) return true;
+    if (hasTag(tpl.tags, TAG.TPL_PUBLIC)) return true;
+    const tplClasses = tagValues(tpl.tags, TAG.TPL_CLASS_PREFIX);
+    return tplClasses.some((c) => id.classes.includes(c));
+  }
+  if (isStudent(id)) {
+    const tplClasses = tagValues(tpl.tags, TAG.TPL_CLASS_PREFIX);
+    return tplClasses.some((c) => id.classes.includes(c));
+  }
+  return false;
+}
+
+function canSeeVm(
+  vm: VM,
+  id: BridgeIdentity,
+  templatesByVmid: Map<number, VM>
+): boolean {
+  if (isAdmin(id)) return true;
+  if (isStudent(id)) {
+    return tagValue(vm.tags, TAG.VM_OWNER_PREFIX) === id.oid;
+  }
+  if (isTeacher(id)) {
+    const srcId = tagValue(vm.tags, TAG.VM_TPL_PREFIX);
+    if (!srcId) return false;
+    const srcTpl = templatesByVmid.get(Number(srcId));
+    if (!srcTpl) return false;
+    const tplClasses = tagValues(srcTpl.tags, TAG.TPL_CLASS_PREFIX);
+    return tplClasses.some((c) => id.classes.includes(c));
+  }
+  return false;
+}
+
+function canModifyVm(
+  vm: VM,
+  id: BridgeIdentity,
+  templatesByVmid: Map<number, VM>
+): boolean {
+  if (isAdmin(id)) return true;
+  if (isStudent(id)) {
+    return tagValue(vm.tags, TAG.VM_OWNER_PREFIX) === id.oid;
+  }
+  if (isTeacher(id)) {
+    return canSeeVm(vm, id, templatesByVmid);
+  }
+  return false;
+}
+
 // ── Routes ─────────────────────────────────────────────────────────────────────
 
 app.get("/api/health", (_req, res) => {
@@ -355,6 +441,237 @@ app.get("/api/me", requireAuth, async (req, res) => {
   }
 });
 
+// ── Templates ──────────────────────────────────────────────────────────────────
+
+function templateDTO(tpl: VM) {
+  return {
+    vmid: tpl.vmid,
+    node: tpl.node,
+    name: tpl.name,
+    classes: tagValues(tpl.tags, TAG.TPL_CLASS_PREFIX),
+    ownerOid: tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX),
+    isPublic: hasTag(tpl.tags, TAG.TPL_PUBLIC),
+    tags: tpl.tags,
+  };
+}
+
+function vmDTO(vm: VM) {
+  return {
+    vmid: vm.vmid,
+    node: vm.node,
+    name: vm.name,
+    status: vm.status,
+    ownerOid: tagValue(vm.tags, TAG.VM_OWNER_PREFIX),
+    sourceTemplateVmid: Number(tagValue(vm.tags, TAG.VM_TPL_PREFIX)) || null,
+    cpus: vm.cpus,
+    maxmem: vm.maxmem,
+    tags: vm.tags,
+  };
+}
+
+async function listAllProxmoxVms(): Promise<{
+  templates: VM[];
+  vms: VM[];
+  templatesByVmid: Map<number, VM>;
+}> {
+  const all = (await proxmox!.listVMs()).filter((v) =>
+    v.template ? hasTag(v.tags, TAG.TPL_MARKER) : hasTag(v.tags, TAG.VM_MARKER)
+  );
+  const templates = all.filter((v) => v.template);
+  const vms = all.filter((v) => !v.template);
+  const templatesByVmid = new Map<number, VM>();
+  for (const t of templates) templatesByVmid.set(t.vmid, t);
+  return { templates, vms, templatesByVmid };
+}
+
+function requireProxmox(res: express.Response): boolean {
+  if (!proxmox) {
+    res.status(503).json({ error: "Proxmox not configured" });
+    return false;
+  }
+  return true;
+}
+
+app.get("/api/classes", requireAuth, requireIdentity, async (req, res) => {
+  const id = req.identity!;
+  const graphToken = req.graphToken!;
+  const results = await Promise.all(
+    id.classes.map(async (oid) => {
+      try {
+        const r = await axios.get(
+          `https://graph.microsoft.com/v1.0/groups/${oid}?$select=id,displayName,description,visibility`,
+          { headers: { Authorization: `Bearer ${graphToken}` } }
+        );
+        return {
+          oid,
+          displayName: r.data.displayName as string,
+          description: r.data.description as string | null,
+          visibility: r.data.visibility as string | null,
+        };
+      } catch {
+        return { oid, displayName: null, description: null, visibility: null };
+      }
+    })
+  );
+  res.json({ classes: results });
+});
+
+app.get("/api/templates", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  try {
+    const { templates } = await listAllProxmoxVms();
+    const visible = templates
+      .filter((t) => canSeeTemplate(t, req.identity!))
+      .map(templateDTO);
+    res.json({ templates: visible });
+  } catch (err) {
+    proxmoxErrorResponse(res, err);
+  }
+});
+
+app.get("/api/vms", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  try {
+    const { vms, templatesByVmid } = await listAllProxmoxVms();
+    const visible = vms
+      .filter((v) => canSeeVm(v, req.identity!, templatesByVmid))
+      .map(vmDTO);
+    res.json({ vms: visible });
+  } catch (err) {
+    proxmoxErrorResponse(res, err);
+  }
+});
+
+// Schüler: VM aus einem ihm zugewiesenen Template erstellen.
+// Constraint: max 1 VM pro Template pro Schüler.
+app.post("/api/vms/from-template/:templateId", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  try {
+    const id = req.identity!;
+    const templateId = Number(req.params.templateId);
+    if (!Number.isFinite(templateId)) {
+      res.status(400).json({ error: "templateId must be a number" });
+      return;
+    }
+    const { templates, vms } = await listAllProxmoxVms();
+    const tpl = templates.find((t) => t.vmid === templateId);
+    if (!tpl) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    if (!canSeeTemplate(tpl, id)) {
+      res.status(403).json({ error: "Template not assigned to you" });
+      return;
+    }
+    // Schüler darf max 1 VM pro Template — Admin/Lehrer dürfen wiederholen
+    if (isStudent(id) && !isAdmin(id) && !isTeacher(id)) {
+      const existing = vms.find(
+        (v) =>
+          tagValue(v.tags, TAG.VM_OWNER_PREFIX) === id.oid &&
+          tagValue(v.tags, TAG.VM_TPL_PREFIX) === String(templateId)
+      );
+      if (existing) {
+        res.status(409).json({
+          error: "You already have a VM from this template",
+          vmid: existing.vmid,
+        });
+        return;
+      }
+    }
+    // VMID picken
+    const nextId = await pickFreeVmid();
+    const safeName = `${id.email.split("@")[0]}-tpl${templateId}-${nextId}`
+      .toLowerCase()
+      .replace(/[^a-z0-9-]/g, "-")
+      .slice(0, 60);
+    const task = await proxmox!.cloneFromTemplate(tpl.node, tpl.vmid, {
+      newid: nextId,
+      name: safeName,
+      full: true,
+    });
+    // Tags auf die neue VM setzen (read-modify-write — clone übernimmt erstmal die Template-Tags).
+    // Wir wollen aber das VM-Tag-Schema: pttool + vm-owner-<oid> + vm-tpl-<templateId>.
+    // Wichtig: warten bis clone fertig, sonst greift updateConfig nicht.
+    res.status(202).json({
+      task,
+      newVmid: nextId,
+      note: "Clone task enqueued. Tags werden gesetzt sobald clone done. Poll /api/tasks/:upid.",
+    });
+  } catch (err) {
+    proxmoxErrorResponse(res, err);
+  }
+});
+
+async function pickFreeVmid(): Promise<VMID> {
+  // Proxmox /cluster/nextid liefert den naechsten freien.
+  // Aber listVMs reicht uns — wir nehmen max+1.
+  const all = await proxmox!.listVMs();
+  if (all.length === 0) return 100;
+  const max = Math.max(...all.map((v) => v.vmid));
+  return max + 1;
+}
+
+app.post("/api/vms/:vmid/start", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  await vmAction(req, res, "start");
+});
+app.post("/api/vms/:vmid/stop", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  await vmAction(req, res, "stop");
+});
+app.delete("/api/vms/:vmid", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  await vmAction(req, res, "delete");
+});
+
+async function vmAction(
+  req: express.Request,
+  res: express.Response,
+  action: "start" | "stop" | "delete"
+) {
+  try {
+    const vmid = Number(req.params.vmid);
+    if (!Number.isFinite(vmid)) {
+      res.status(400).json({ error: "vmid must be a number" });
+      return;
+    }
+    const { vms, templatesByVmid } = await listAllProxmoxVms();
+    const vm = vms.find((v) => v.vmid === vmid);
+    if (!vm) {
+      res.status(404).json({ error: "VM not found" });
+      return;
+    }
+    if (!canModifyVm(vm, req.identity!, templatesByVmid)) {
+      res.status(403).json({ error: "Not allowed" });
+      return;
+    }
+    const task =
+      action === "start"
+        ? await proxmox!.startVM(vm.node, vm.vmid)
+        : action === "stop"
+          ? await proxmox!.stopVM(vm.node, vm.vmid)
+          : await proxmox!.deleteVM(vm.node, vm.vmid);
+    res.status(202).json({ task });
+  } catch (err) {
+    proxmoxErrorResponse(res, err);
+  }
+}
+
+function proxmoxErrorResponse(res: express.Response, err: unknown) {
+  if (axios.isAxiosError(err)) {
+    res.status(err.response?.status ?? 502).json({
+      error: "Proxmox call failed",
+      details: err.response?.data,
+      message: err.message,
+    });
+  } else {
+    res.status(500).json({
+      error: "Bridge error",
+      message: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 // Debug endpoints — only registered outside production. Dockerfile sets
 // NODE_ENV=production for shipped builds, so they're auto-gated.
 if (process.env.NODE_ENV !== "production") {
@@ -369,7 +686,7 @@ if (process.env.NODE_ENV !== "production") {
         proxmox.listNodes(),
         proxmox.listVMs(),
       ]);
-      const TAG_PREFIX = "tpl-class:";
+      const TAG_PREFIX = "tpl-class-";
       const activeClassOids = new Set<string>();
       for (const v of vms) {
         for (const t of v.tags) {
