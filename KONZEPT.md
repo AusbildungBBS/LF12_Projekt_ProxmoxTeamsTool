@@ -138,7 +138,7 @@ Pro eingehendem Request:
 ### Wie die Bridge an die Mitgliedschaft kommt
 - **Primärquelle:** `groups`-Claim direkt im Access-Token (in Entra: Token configuration → Groups claim → „All groups", Format Group ID). Spart pro Request einen Graph-Call. Implementiert in [bridge/index.ts → `getUserGroups`](bridge/index.ts).
 - **Overage-Fallback:** Bei >150 Group-Memberships schaltet Entra die `groups`-Array auf einen `_claim_names`-Pointer um — dann fetcht die Bridge via OBO + `POST /v1.0/me/getMemberGroups` und cached das Ergebnis pro User-OID 10 min in-memory. Für Schüler praktisch kein Thema, für Lehrer mit vielen Klassen + Tenant-Groups evtl. doch.
-- **Filterung in der Bridge:** Bei „All groups" landen auch nicht-Klassen-Groups (Security-/Distribution-Groups) im Token. Wir whitelisten serverseitig über die Klassen-Tags in Proxmox (`tpl-class:<oid>`) — alles, was dort nicht referenziert ist, wird ignoriert.
+- **Filterung in der Bridge:** Bei „All groups" landen auch nicht-Klassen-Groups (Security-/Distribution-Groups) im Token. Wir whitelisten serverseitig über die Klassen-Tags in Proxmox (`tpl-class:<oid>`) — alles, was dort nicht referenziert ist, wird ignoriert. Implementiert in [bridge/classes.ts → `filterToActiveClasses`](bridge/classes.ts); Whitelist wird einmal pro 5 min aus `cluster/resources` aggregiert. Ist `PROXMOX_URL` nicht gesetzt, läuft die Bridge ohne Filter (Dev-Fallback).
 
 ### Pflege der Klassen
 - Liegt komplett im Tenant: Klassen-Group anlegen, Lehrer + Schüler hinzufügen — fertig. Kann über Schulverwaltung/IT/Teams-Admin laufen, **wir bauen dafür kein eigenes UI**.

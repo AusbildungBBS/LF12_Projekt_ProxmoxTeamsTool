@@ -119,9 +119,22 @@ Solange kein Tenant erreichbar ist, lässt sich die UI über einen URL-Parameter
 
 Implementation: [src/auth/DevFakeAuth.tsx](../src/auth/DevFakeAuth.tsx). Greift nur, wenn explizit aktiviert.
 
-## 8. Proxmox (optional, später)
+## 8. Proxmox-Anbindung
 
-Für die VM-Endpoints braucht's eine Proxmox-Instanz. Aktuell ist `ProxmoxClient` nur als Interface in [bridge/proxmox/](../bridge/proxmox/), die Bridge-Endpoints für VMs/Templates kommen erst danach. Wenn du jetzt schon eine Dev-Proxmox aufsetzen willst: [proxmox-dev-setup.md](proxmox-dev-setup.md).
+Sobald die Bridge eine erreichbare Proxmox-Instanz sieht, filtert sie die `classes`-Liste in der Identity gegen die Proxmox-Tag-Whitelist: nur Group-OIDs, die in mindestens einem Template als `tpl-class:<oid>` markiert sind, gelten als „aktive Klasse für dieses Tool". Ohne Proxmox-Konfig (Variablen leer) wird der Filter übersprungen und die Bridge gibt alle Memberships ungefiltert weiter — gut fürs frühe Dev-Stadium, schlecht für Prod.
+
+Was die Bridge erwartet (in `.env`):
+
+| Variable | Wofür |
+|---|---|
+| `PROXMOX_URL` | z. B. `https://10.5.0.10:8006`. Wenn von extern via Tailscale + Windows-Portproxy: `https://<tailscale-ip-des-windows>:8006`. |
+| `PROXMOX_TOKEN_ID` | Token-ID im Format `user@realm!tokenname`, z. B. `root@pam!pttool-dev`. |
+| `PROXMOX_TOKEN_SECRET` | Secret-UUID — wird beim Anlegen genau einmal angezeigt. |
+| `PROXMOX_TLS_REJECT_UNAUTHORIZED` | `false` für Self-Signed-Cert (Dev). Prod sollte gültiges Cert haben, Variable weglassen oder `true`. |
+
+Token erzeugen im Proxmox-WebUI: **Datacenter → Permissions → API Tokens → Add**. Für Dev mit Privilege Separation **aus** (Token erbt User-Rechte). Für Prod dedizierten User mit minimal nötigen Rechten (PVEVMAdmin auf einem Resource-Pool) — siehe [proxmox-dev-setup.md](proxmox-dev-setup.md) für ein Dev-VM-Setup auf Hyper-V.
+
+Smoke-Test nach Konfig: `GET /api/debug/proxmox` (im Dev-Modus, mit gültigem Bearer-Token) gibt Nodes + alle Resources + die gerade aktive Klassen-Whitelist zurück. Wenn das durchgeht, sieht die Bridge Proxmox sauber.
 
 ## 9. Docker (Bridge produktiv)
 
