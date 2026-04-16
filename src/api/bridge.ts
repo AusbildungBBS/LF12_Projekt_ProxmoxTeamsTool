@@ -40,15 +40,18 @@ export interface TaskRef {
 export function useBridgeApi() {
   const { accessToken } = useAuth();
   return useMemo(() => {
-    const baseHeaders = accessToken
+    const baseHeaders: Record<string, string> = accessToken
       ? { Authorization: `Bearer ${accessToken}` }
       : {};
 
     async function call<T>(url: string, init?: RequestInit): Promise<T> {
-      const r = await fetch(url, {
-        ...init,
-        headers: { ...baseHeaders, ...(init?.headers || {}) },
-      });
+      const headers: Record<string, string> = { ...baseHeaders };
+      if (init?.headers) {
+        for (const [k, v] of Object.entries(init.headers as Record<string, string>)) {
+          headers[k] = v;
+        }
+      }
+      const r = await fetch(url, { ...init, headers });
       if (!r.ok) {
         const text = await r.text();
         throw new Error(`${r.status} ${text}`);
