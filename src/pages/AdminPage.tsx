@@ -1,15 +1,47 @@
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/TeamsAuthProvider";
+import {
+  useBridgeApi,
+  type Template,
+  type VmDTO,
+  type ClassInfo,
+} from "../api/bridge";
 
 export function AdminPage() {
-  const { hasRole, isAuthenticated } = useAuth();
+  const { hasRole, isAuthenticated, accessToken } = useAuth();
+  const api = useBridgeApi();
 
-  if (!isAuthenticated) {
-    return <p>Bitte einloggen.</p>;
-  }
+  const [templates, setTemplates] = useState<Template[] | null>(null);
+  const [vms, setVms] = useState<VmDTO[] | null>(null);
+  const [classes, setClasses] = useState<ClassInfo[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const refresh = useCallback(async () => {
+    setError(null);
+    try {
+      const [t, v, c] = await Promise.all([
+        api.listTemplates(),
+        api.listVms(),
+        api.listClasses(),
+      ]);
+      setTemplates(t);
+      setVms(v);
+      setClasses(c);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }, [api]);
+
+  useEffect(() => {
+    if (!accessToken) return;
+    refresh();
+  }, [accessToken, refresh]);
+
+  if (!isAuthenticated) return <p>Bitte einloggen.</p>;
   if (!hasRole("Proxmox.Admin")) {
     return (
       <section className="page">
-        <p>Diese Seite ist nur für Admins.</p>
+        <p>Diese Seite ist nur fuer Admins.</p>
       </section>
     );
   }
@@ -18,11 +50,54 @@ export function AdminPage() {
     <section className="page">
       <header className="page-header">
         <h2>Admin Console</h2>
-        <p className="page-subtitle">Globale Sicht über alle VMs, Templates und Klassen.</p>
+        <p className="page-subtitle">Globale Sicht ueber alle Templates, VMs und Klassen.</p>
       </header>
 
-      <div className="card empty">
-        <p>Noch leer. Hier kommt die globale Verwaltung hin.</p>
+      {error && <div className="card error">Fehler: {error}</div>}
+
+      <div className="admin-grid">
+        <div className="card">
+          <h3>Templates ({templates?.length ?? "—"})</h3>
+          <ul>
+            {templates?.map((t) => (
+              <li key={t.vmid}>
+                <strong>{t.name}</strong> (VMID {t.vmid})
+                {t.isPublic && <span className="badge badge-public">public</span>}
+                <br />
+                <small>{t.classes.length} Klassen, Owner {t.ownerOid?.slice(0, 8) ?? "—"}</small>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="card">
+          <h3>VMs ({vms?.length ?? "—"})</h3>
+          <ul>
+            {vms?.map((v) => (
+              <li key={v.vmid}>
+                <strong>{v.name}</strong> (VMID {v.vmid})
+                <span className={`badge badge-${v.status}`}>{v.status}</span>
+                <br />
+                <small>
+                  Owner {v.ownerOid?.slice(0, 8) ?? "—"} · aus Template {v.sourceTemplateVmid ?? "—"}
+                </small>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <div className="card">
+          <h3>Aktive Klassen ({classes?.length ?? "—"})</h3>
+          <ul>
+            {classes?.map((c) => (
+              <li key={c.oid}>
+                <strong>{c.displayName ?? "(unbekannt)"}</strong>
+                <br />
+                <small>{c.oid}</small>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </section>
   );

@@ -532,3 +532,98 @@ a:hover {
   flex-direction: column;
   gap: 1.25rem;
 }
+
+/* ── Cards: list / row / meta / actions ─────────────────────────────────── */
+.card-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+}
+.card-meta {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  color: #666;
+  font-size: 0.875rem;
+  margin-top: 0.4rem;
+}
+.card-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+.card-actions button {
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid #888;
+  background: #f5f5f5;
+  cursor: pointer;
+}
+.card-actions button:hover:not(:disabled) {
+  background: #e5e5e5;
+}
+.card-actions button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.card-actions button.danger {
+  background: #fff0f0;
+  border-color: #c33;
+  color: #c33;
+}
+.card-actions button.danger:hover:not(:disabled) {
+  background: #ffe0e0;
+}
+.card-desc {
+  margin: 0.4rem 0 0 0;
+  color: #555;
+  font-size: 0.9rem;
+}
+
+.card.error {
+  border-left: 4px solid #c33;
+  background: #fff5f5;
+}
+.card.hint {
+  border-left: 4px solid #4a8;
+  background: #f5fff8;
+}
+
+/* ── Badges ──────────────────────────────────────────────────────────────── */
+.badge.badge-public { background: #ffeaa3; color: #6b4d00; }
+.badge.badge-running { background: #d5f3df; color: #245d34; }
+.badge.badge-stopped { background: #e8e8e8; color: #555; }
+.badge.badge-paused { background: #ffe1c2; color: #7a4500; }
+.badge.badge-unknown { background: #eee; color: #777; }
+
+/* ── Admin grid ──────────────────────────────────────────────────────────── */
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+.admin-grid .card ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.admin-grid .card li {
+  border-top: 1px solid #eee;
+  padding-top: 0.5rem;
+  font-size: 0.9rem;
+}
+.admin-grid .card li:first-child {
+  border-top: 0;
+}
