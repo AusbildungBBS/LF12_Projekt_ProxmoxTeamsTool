@@ -111,11 +111,12 @@ export class RealProxmoxClient implements ProxmoxClient {
     return this.taskAction(node, vmid, "start");
   }
 
-  async stopVM(node: string, vmid: VMID): Promise<TaskRef> {
-    // "shutdown" lets the guest OS shut cleanly; "stop" pulls the plug.
-    // Bridge users (Schueler) probably want clean shutdown — UI can offer
-    // a force-stop separately later.
+  async shutdownVM(node: string, vmid: VMID): Promise<TaskRef> {
     return this.taskAction(node, vmid, "shutdown");
+  }
+
+  async stopVM(node: string, vmid: VMID): Promise<TaskRef> {
+    return this.taskAction(node, vmid, "stop");
   }
 
   async deleteVM(node: string, vmid: VMID): Promise<TaskRef> {
@@ -123,6 +124,20 @@ export class RealProxmoxClient implements ProxmoxClient {
       `/nodes/${node}/qemu/${vmid}`
     );
     return { node, upid: r.data.data };
+  }
+
+  async attachDisk(
+    node: string,
+    vmid: VMID,
+    opts: { storage: string; sizeGb: number; slot?: string }
+  ): Promise<void> {
+    const slot = opts.slot ?? "scsi0";
+    // Proxmox-Format: "<storage>:<size-in-GB>"
+    const body = new URLSearchParams();
+    body.set(slot, `${opts.storage}:${opts.sizeGb}`);
+    await this.http.put(`/nodes/${node}/qemu/${vmid}/config`, body.toString(), {
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    });
   }
 
   // ── Config / tags ────────────────────────────────────────────────────────

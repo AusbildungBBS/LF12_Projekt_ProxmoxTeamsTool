@@ -615,6 +615,10 @@ app.post("/api/vms/:vmid/start", requireAuth, requireIdentity, async (req, res) 
   if (!requireProxmox(res)) return;
   await vmAction(req, res, "start");
 });
+app.post("/api/vms/:vmid/shutdown", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  await vmAction(req, res, "shutdown");
+});
 app.post("/api/vms/:vmid/stop", requireAuth, requireIdentity, async (req, res) => {
   if (!requireProxmox(res)) return;
   await vmAction(req, res, "stop");
@@ -624,10 +628,48 @@ app.delete("/api/vms/:vmid", requireAuth, requireIdentity, async (req, res) => {
   await vmAction(req, res, "delete");
 });
 
+// Disk anhaengen. Admin/Lehrer (canModify) duerfen Disks an alle VMs in
+// ihrem Sichtbereich attachen; Schueler an ihre eigene VM.
+app.post("/api/vms/:vmid/disk", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  try {
+    const vmid = Number(req.params.vmid);
+    if (!Number.isFinite(vmid)) {
+      res.status(400).json({ error: "vmid must be a number" });
+      return;
+    }
+    const sizeGb = Number(req.body?.sizeGb);
+    const storage = String(req.body?.storage ?? "");
+    const slot = req.body?.slot ? String(req.body.slot) : undefined;
+    if (!Number.isFinite(sizeGb) || sizeGb <= 0 || sizeGb > 256) {
+      res.status(400).json({ error: "sizeGb must be 1..256" });
+      return;
+    }
+    if (!storage) {
+      res.status(400).json({ error: "storage required (e.g. local-lvm)" });
+      return;
+    }
+    const { vms, templatesByVmid } = await listAllProxmoxVms();
+    const vm = vms.find((v) => v.vmid === vmid);
+    if (!vm) {
+      res.status(404).json({ error: "VM not found" });
+      return;
+    }
+    if (!canModifyVm(vm, req.identity!, templatesByVmid)) {
+      res.status(403).json({ error: "Not allowed" });
+      return;
+    }
+    await proxmox!.attachDisk(vm.node, vm.vmid, { storage, sizeGb, slot });
+    res.status(200).json({ ok: true, slot: slot ?? "scsi0", sizeGb, storage });
+  } catch (err) {
+    proxmoxErrorResponse(res, err);
+  }
+});
+
 async function vmAction(
   req: express.Request,
   res: express.Response,
-  action: "start" | "stop" | "delete"
+  action: "start" | "shutdown" | "stop" | "delete"
 ) {
   try {
     const vmid = Number(req.params.vmid);
@@ -648,9 +690,11 @@ async function vmAction(
     const task =
       action === "start"
         ? await proxmox!.startVM(vm.node, vm.vmid)
-        : action === "stop"
-          ? await proxmox!.stopVM(vm.node, vm.vmid)
-          : await proxmox!.deleteVM(vm.node, vm.vmid);
+        : action === "shutdown"
+          ? await proxmox!.shutdownVM(vm.node, vm.vmid)
+          : action === "stop"
+            ? await proxmox!.stopVM(vm.node, vm.vmid)
+            : await proxmox!.deleteVM(vm.node, vm.vmid);
     res.status(202).json({ task });
   } catch (err) {
     proxmoxErrorResponse(res, err);

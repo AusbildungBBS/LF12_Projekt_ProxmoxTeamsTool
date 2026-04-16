@@ -29,15 +29,39 @@ export function MyVMsPage() {
 
   async function run(
     vm: VmDTO,
-    action: "start" | "stop" | "delete"
+    action: "start" | "shutdown" | "stop" | "delete"
   ) {
     if (action === "delete" && !confirm(`VM "${vm.name}" wirklich loeschen?`)) return;
+    if (action === "stop" && !confirm(`VM "${vm.name}" hart stoppen (Plug pull)?`)) return;
     setBusyId(vm.vmid);
     setError(null);
     try {
       if (action === "start") await api.startVm(vm.vmid);
+      else if (action === "shutdown") await api.shutdownVm(vm.vmid);
       else if (action === "stop") await api.stopVm(vm.vmid);
       else await api.deleteVm(vm.vmid);
+      await refresh();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function attachDisk(vm: VmDTO) {
+    const sizeStr = prompt(`Disk-Groesse fuer "${vm.name}" in GB?`, "8");
+    if (sizeStr === null) return;
+    const sizeGb = Number(sizeStr);
+    if (!Number.isFinite(sizeGb) || sizeGb <= 0) {
+      setError("Ungueltige Disk-Groesse");
+      return;
+    }
+    const storage = prompt("Storage?", "local-lvm");
+    if (!storage) return;
+    setBusyId(vm.vmid);
+    setError(null);
+    try {
+      await api.attachDisk(vm.vmid, { storage, sizeGb });
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -95,10 +119,25 @@ export function MyVMsPage() {
                   Start
                 </button>
                 <button
+                  disabled={busyId === v.vmid || v.status !== "running"}
+                  onClick={() => run(v, "shutdown")}
+                  title="Sauberes Herunterfahren via Guest-Agent (falls vorhanden)"
+                >
+                  Shutdown
+                </button>
+                <button
                   disabled={busyId === v.vmid || v.status === "stopped"}
                   onClick={() => run(v, "stop")}
+                  title="Hart stoppen — Plug pull"
                 >
-                  Stop
+                  Stop (hart)
+                </button>
+                <button
+                  disabled={busyId === v.vmid}
+                  onClick={() => attachDisk(v)}
+                  title="Disk an diese VM anhaengen"
+                >
+                  + Disk
                 </button>
                 <button
                   className="danger"

@@ -69,10 +69,24 @@ export function useBridgeApi() {
         ),
       startVm: (vmid: number) =>
         call<{ task: TaskRef }>(`/api/vms/${vmid}/start`, { method: "POST" }),
+      shutdownVm: (vmid: number) =>
+        call<{ task: TaskRef }>(`/api/vms/${vmid}/shutdown`, { method: "POST" }),
       stopVm: (vmid: number) =>
         call<{ task: TaskRef }>(`/api/vms/${vmid}/stop`, { method: "POST" }),
       deleteVm: (vmid: number) =>
         call<{ task: TaskRef }>(`/api/vms/${vmid}`, { method: "DELETE" }),
+      attachDisk: (
+        vmid: number,
+        opts: { storage: string; sizeGb: number; slot?: string }
+      ) =>
+        call<{ ok: true; slot: string; sizeGb: number; storage: string }>(
+          `/api/vms/${vmid}/disk`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(opts),
+          }
+        ),
     };
   }, [accessToken]);
 }

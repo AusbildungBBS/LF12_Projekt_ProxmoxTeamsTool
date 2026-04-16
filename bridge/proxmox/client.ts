@@ -27,8 +27,21 @@ export interface ProxmoxClient {
   ): Promise<TaskRef>;
 
   startVM(node: string, vmid: VMID): Promise<TaskRef>;
+  // Graceful — needs qemu-guest-agent in der VM.
+  shutdownVM(node: string, vmid: VMID): Promise<TaskRef>;
+  // Force — zieht den Stecker, brauch keinen Agent.
   stopVM(node: string, vmid: VMID): Promise<TaskRef>;
   deleteVM(node: string, vmid: VMID): Promise<TaskRef>;
+
+  // Disk anhaengen. `storage` = Proxmox-Storage-Name (z.B. "local-lvm"),
+  // `sizeGb` = Groesse in Gigabyte, `slot` = Bus + Index (default "scsi0").
+  // Funktioniert nur an non-Templates (Proxmox erlaubt keine config-Changes
+  // an Templates).
+  attachDisk(
+    node: string,
+    vmid: VMID,
+    opts: { storage: string; sizeGb: number; slot?: string }
+  ): Promise<void>;
 
   // ── Config / tags ──────────────────────────────────────────────────────
   // Updates a subset of the VM config. Tags are read-modify-write on the
