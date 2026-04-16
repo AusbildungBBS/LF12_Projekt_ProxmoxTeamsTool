@@ -2,7 +2,7 @@
 
 Microsoft-Teams-Tab, mit dem Lehrer Schülern Proxmox-VE-VMs aus Templates zur Verfügung stellen. Drei Rollen (Admin / Lehrer / Schüler), Klassen kommen aus M365-Groups, alle Proxmox-Metadaten leben als Tags in Proxmox selbst.
 
-> **Status:** Auth-Gerüst + Bridge mit JWT-Validierung steht, Identity-Resolver (zweischienig Standard/EDU), `RealProxmoxClient` mit Token-Auth angebunden. Klassen-Filter über Proxmox-Tags aktiv. Die endgültigen VM-/Template-Endpoints fehlen noch — siehe [Roadmap](#roadmap).
+> **Status:** Funktionierender End-to-End-Flow vom Teams-Login über Bridge bis Proxmox. Auth zweischienig (Standard/EDU), Klassen-Filter über Proxmox-Tags, Templates-/VMs-/Klassen-Endpoints mit Rollen- und Klassen-Authz, Frontend rendert Live-Daten. Offen: Tag-Finalize nach Clone, Prod-Deployment via Tunnel — siehe [Roadmap](#roadmap).
 
 Mehr Details:
 - **Setup-Anleitung (Onboarding):** [docs/setup.md](docs/setup.md)
@@ -93,8 +93,10 @@ Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-Variablen tragen
 
 ## Roadmap
 
-1. ~~**`RealProxmoxClient`**~~ — erledigt. HTTP-Wrapper mit API-Token-Auth gegen Proxmox VE 8, Klassen-Filter via `tpl-class-<oid>`-Tags. Setup-Hinweise: [docs/setup.md → Proxmox-Anbindung](docs/setup.md), Dev-VM auf Hyper-V: [docs/proxmox-dev-setup.md](docs/proxmox-dev-setup.md).
-2. **Erste Bridge-Endpoints** — `GET /api/vms`, `GET /api/templates`, gefiltert nach Rolle + Klassen-Membership.
-3. **Frontend-Wiring** — die aktuell als Empty-State stehenden Seiten gegen echte Endpoints fetchen.
-4. **Teams-Manifest aktualisieren** — auf die produktive Bridge-URL.
-5. **Cloudflare-Tunnel-Deployment** der Bridge im Schulnetz.
+1. ~~**`RealProxmoxClient`**~~ — erledigt. HTTP-Wrapper mit API-Token-Auth gegen Proxmox VE 8, Klassen-Filter via `tpl-class-<oid>`-Tags.
+2. ~~**Erste Bridge-Endpoints**~~ — erledigt. `GET /api/templates`, `GET /api/vms`, `GET /api/classes`, `POST /api/vms/from-template/:id`, `POST /api/vms/:vmid/start|/stop`, `DELETE /api/vms/:vmid`. Authz pro Endpoint mit Rolle + Owner-/Klassen-Check.
+3. ~~**Frontend-Wiring**~~ — erledigt. Templates-, MyVMs-, Klassen- und Admin-Page lesen live aus den Bridge-Endpoints und rendern Karten + Action-Buttons.
+4. **VM-Tagging beim Clone fertig** — Clone uebergibt der neuen VM noch nicht das VM-Tag-Set (`pttool;vm-owner-<oid>;vm-tpl-<src>`); aktuell behalten geklonte VMs die Template-Tags. Fix: nach Task-Abschluss `updateConfig` mit den richtigen Tags.
+5. **Teams-Manifest aktualisieren** — auf die produktive Bridge-URL.
+6. **Cloudflare-Tunnel-Deployment** der Bridge im Schulnetz.
+7. **Dedizierter Proxmox-User** statt `root@pam` fuer die Bridge.
