@@ -88,12 +88,16 @@ export function TemplatesPage() {
                 <span>Node: {t.node}</span>
               </div>
               {isStudent && (
-                <div className="card-actions">
+                <div className="card-actions icon-actions">
                   <button
+                    className="icon-button"
+                    aria-label="VM aus diesem Template erstellen"
+                    title="VM aus diesem Template erstellen"
+                    data-tooltip="VM aus diesem Template erstellen"
                     onClick={() => instantiate(t)}
                     disabled={busyId === t.vmid}
                   >
-                    {busyId === t.vmid ? "Erstelle..." : "VM aus diesem Template anlegen"}
+                    {busyId === t.vmid ? "…" : "➕"}
                   </button>
                 </div>
               )}

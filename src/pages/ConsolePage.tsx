@@ -124,18 +124,39 @@ export function ConsolePage() {
         className={`console-canvas-wrap ${fullscreen ? "fullscreen" : ""}`}
         ref={wrapRef}
       >
-        <div className="console-toolbar">
+        <div className="console-toolbar icon-actions">
           <span className={`badge badge-${status}`}>{status}</span>
           {detail && <span className="console-detail">{detail}</span>}
-          <button onClick={sendCtrlAltDel} disabled={status !== "connected"}>
-            Ctrl+Alt+Del
+          <button
+            className="icon-button"
+            aria-label="Ctrl+Alt+Del"
+            title="Ctrl+Alt+Del an die VM senden"
+            data-tooltip="Ctrl+Alt+Del senden"
+            onClick={sendCtrlAltDel}
+            disabled={status !== "connected"}
+          >
+            ⎈
           </button>
-          <button onClick={toggleFullscreen} disabled={status !== "connected"}>
-            {fullscreen ? "Vollbild verlassen (ESC)" : "Vollbild"}
+          <button
+            className="icon-button"
+            aria-label={fullscreen ? "Vollbild verlassen" : "Vollbild"}
+            title={fullscreen ? "Vollbild verlassen (ESC)" : "Vollbild"}
+            data-tooltip={fullscreen ? "Vollbild verlassen (ESC)" : "Vollbild"}
+            onClick={toggleFullscreen}
+            disabled={status !== "connected"}
+          >
+            ⛶
           </button>
           {!fullscreen && (
             <Link to="/my-vms">
-              <button>Zurueck</button>
+              <button
+                className="icon-button"
+                aria-label="Zurueck"
+                title="Zurueck zur VM-Liste"
+                data-tooltip="Zurueck zur VM-Liste"
+              >
+                ←
+              </button>
             </Link>
           )}
         </div>

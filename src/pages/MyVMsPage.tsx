@@ -100,40 +100,56 @@ export function MyVMsPage() {
                 <span>{v.maxmem ? Math.round(v.maxmem / 1024 / 1024) + " MB" : "? MB"}</span>
                 <span>Node {v.node}</span>
               </div>
-              <div className="card-actions">
+              <div className="card-actions icon-actions">
                 <button
+                  className="icon-button"
+                  aria-label="Start"
+                  title="Start"
+                  data-tooltip="Starten"
                   disabled={busyId === v.vmid || v.status === "running"}
                   onClick={() => run(v, "start")}
                 >
-                  Start
+                  ▶
                 </button>
                 <button
+                  className="icon-button"
+                  aria-label="Shutdown"
+                  title="Sauberes Herunterfahren (Guest-Agent)"
+                  data-tooltip="Sauber herunterfahren"
                   disabled={busyId === v.vmid || v.status !== "running"}
                   onClick={() => run(v, "shutdown")}
-                  title="Sauberes Herunterfahren via Guest-Agent (falls vorhanden)"
                 >
-                  Shutdown
+                  ⏻
                 </button>
                 <button
+                  className="icon-button"
+                  aria-label="Stop (hart)"
+                  title="Hart stoppen — Plug pull"
+                  data-tooltip="Hart stoppen"
                   disabled={busyId === v.vmid || v.status === "stopped"}
                   onClick={() => run(v, "stop")}
-                  title="Hart stoppen — Plug pull"
                 >
-                  Stop (hart)
+                  ⏹
                 </button>
                 <button
+                  className="icon-button"
+                  aria-label="Console"
+                  title="VNC-Console oeffnen"
+                  data-tooltip="Console oeffnen"
                   disabled={busyId === v.vmid || v.status !== "running"}
                   onClick={() => openConsole(v)}
-                  title="VNC-Console im Bridge-WebSocket-Tunnel"
                 >
-                  Console
+                  🖥
                 </button>
                 <button
-                  className="danger"
+                  className="icon-button danger"
+                  aria-label="Loeschen"
+                  title="Loeschen"
+                  data-tooltip="Loeschen"
                   disabled={busyId === v.vmid}
                   onClick={() => run(v, "delete")}
                 >
-                  Loeschen
+                  🗑
                 </button>
               </div>
             </li>
