@@ -796,3 +796,102 @@ a:hover {
   color: #eee;
 }
 .console-toolbar .icon-button:hover:not(:disabled) { background: #3a3a3a; }
+
+/* Wide variant fuer Text-Icons wie "CAD", "Esc", "F1" */
+.icon-button.wide {
+  width: auto;
+  min-width: 40px;
+  padding: 0 0.6rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  font-family: "SF Mono", Consolas, monospace;
+}
+.icon-button.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+.icon-button.active:hover:not(:disabled) {
+  background: var(--primary-active);
+  color: #fff;
+  border-color: var(--primary-active);
+}
+
+/* Virtuelle Tastatur-Leiste — Esc / Tab / Win + F1..F12 */
+.virt-kbd {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.7);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.virt-kbd .virt-key {
+  background: #2a2a2a;
+  border-color: #555;
+  color: #eee;
+  height: 32px;
+  min-width: 44px;
+  font-size: 0.8rem;
+}
+.virt-kbd .virt-key:hover:not(:disabled) {
+  background: #3a3a3a;
+  color: #fff;
+  border-color: #777;
+}
+.virt-kbd-sep {
+  width: 1px;
+  background: rgba(255, 255, 255, 0.2);
+  margin: 0 2px;
+}
+.console-canvas-wrap.fullscreen .virt-kbd {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+
+/* ── Virtuelle Tastatur (react-simple-keyboard) ─────────────────────────── */
+.virt-kbd-wrap {
+  background: rgba(0, 0, 0, 0.85);
+  padding: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.console-canvas-wrap.fullscreen .virt-kbd-wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 10;
+}
+/* Override des Default-Themes von simple-keyboard, damit es ins dunkle
+   Console-Layout passt. */
+.simple-keyboard.pttool-kbd {
+  background: transparent;
+  max-width: 100%;
+}
+.simple-keyboard.pttool-kbd .hg-button {
+  background: #2a2a2a;
+  color: #eee;
+  border: 1px solid #555;
+  border-bottom: 2px solid #444;
+  height: 34px;
+  font-size: 0.85rem;
+}
+.simple-keyboard.pttool-kbd .hg-button:active,
+.simple-keyboard.pttool-kbd .hg-button:hover {
+  background: #3a3a3a;
+  color: #fff;
+}
+.simple-keyboard.pttool-kbd .hg-button.hg-activeButton {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+.simple-keyboard.pttool-kbd .hg-row {
+  margin-bottom: 4px;
+}
+.simple-keyboard.pttool-kbd .hg-row:last-child {
+  margin-bottom: 0;
+}
