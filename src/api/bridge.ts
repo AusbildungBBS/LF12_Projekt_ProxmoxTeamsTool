@@ -97,6 +97,23 @@ export function useBridgeApi() {
           `/api/vms/${vmid}/vnc-session`,
           { method: "POST" }
         ),
+      listAssignableClasses: () =>
+        call<{ classes: ClassInfo[] }>("/api/classes/assignable").then(
+          (d) => d.classes
+        ),
+      claimTemplate: (vmid: number) =>
+        call<Template>(`/api/templates/${vmid}/claim`, { method: "POST" }),
+      releaseTemplate: (vmid: number) =>
+        call<Template>(`/api/templates/${vmid}/release`, { method: "POST" }),
+      updateTemplate: (
+        vmid: number,
+        patch: { isPublic?: boolean; classes?: string[] }
+      ) =>
+        call<Template>(`/api/templates/${vmid}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(patch),
+        }),
     };
   }, [accessToken]);
 }

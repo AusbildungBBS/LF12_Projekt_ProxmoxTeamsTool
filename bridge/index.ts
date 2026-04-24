@@ -265,11 +265,28 @@ function filterAppRoles(roles: string[] | undefined): AppRole[] {
   return roles.filter((r): r is AppRole => allowed.includes(r as AppRole));
 }
 
+async function getRawClassOids(
+  source: "standard" | "edu",
+  claims: BridgeClaims,
+  graphToken: string
+): Promise<string[]> {
+  if (source === "standard") {
+    return getUserGroups(claims, graphToken);
+  }
+  const r = await axios.get(
+    "https://graph.microsoft.com/v1.0/education/me/classes?$expand=group($select=id)&$select=id",
+    { headers: { Authorization: `Bearer ${graphToken}` } }
+  );
+  return (r.data?.value ?? [])
+    .map((c: { group?: { id?: string } }) => c.group?.id)
+    .filter((id: string | undefined): id is string => typeof id === "string");
+}
+
 async function resolveFromStandard(
   claims: BridgeClaims,
   graphToken: string
 ): Promise<BridgeIdentity> {
-  const allGroups = await getUserGroups(claims, graphToken);
+  const allGroups = await getRawClassOids("standard", claims, graphToken);
   const classes = await filterToActiveClasses(proxmox, allGroups);
   return {
     oid: claims.oid!,
@@ -294,13 +311,7 @@ async function resolveFromEdu(
   );
   const eduRoles = mapEduRoleToAppRoles(userRes.data?.primaryRole);
 
-  const classesRes = await axios.get(
-    "https://graph.microsoft.com/v1.0/education/me/classes?$expand=group($select=id)&$select=id,displayName",
-    { headers: { Authorization: `Bearer ${graphToken}` } }
-  );
-  const rawClasses: string[] = (classesRes.data?.value ?? [])
-    .map((c: { group?: { id?: string } }) => c.group?.id)
-    .filter((id: string | undefined): id is string => typeof id === "string");
+  const rawClasses = await getRawClassOids("edu", claims, graphToken);
   const classes = await filterToActiveClasses(proxmox, rawClasses);
 
   // Admin role is never in EDU's primaryRole — it stays an explicit App Role.
@@ -364,7 +375,11 @@ function isStudent(id: BridgeIdentity): boolean {
 function canSeeTemplate(tpl: VM, id: BridgeIdentity): boolean {
   if (isAdmin(id)) return true;
   if (isTeacher(id)) {
-    if (tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX) === id.oid) return true;
+    const ownerOid = tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX);
+    // Ungeclaimte Templates sind fuer jeden Lehrer sichtbar -- sonst koennte
+    // er sie nicht via UI claimen.
+    if (!ownerOid) return true;
+    if (ownerOid === id.oid) return true;
     if (hasTag(tpl.tags, TAG.TPL_PUBLIC)) return true;
     const tplClasses = tagValues(tpl.tags, TAG.TPL_CLASS_PREFIX);
     return tplClasses.some((c) => id.classes.includes(c));
@@ -522,6 +537,168 @@ app.get("/api/classes", requireAuth, requireIdentity, async (req, res) => {
     })
   );
   res.json({ classes: results });
+});
+
+async function resolveClassDisplayNames(
+  oids: string[],
+  graphToken: string
+): Promise<Array<{ oid: string; displayName: string | null }>> {
+  return Promise.all(
+    oids.map(async (oid) => {
+      try {
+        const r = await axios.get(
+          `https://graph.microsoft.com/v1.0/groups/${oid}?$select=id,displayName`,
+          { headers: { Authorization: `Bearer ${graphToken}` } }
+        );
+        return { oid, displayName: r.data.displayName as string };
+      } catch {
+        return { oid, displayName: null };
+      }
+    })
+  );
+}
+
+// Alle Klassen, die der Lehrer einem Template zuweisen koennte -- das sind
+// seine eigenen M365-Group-Memberships (ohne den Active-Filter), denn ein
+// Lehrer kann *seine* Klassen aktivieren, indem er ein Template hin haengt.
+app.get("/api/classes/assignable", requireAuth, requireIdentity, async (req, res) => {
+  if (!isTeacher(req.identity!) && !isAdmin(req.identity!)) {
+    res.status(403).json({ error: "Nur Lehrer/Admin" });
+    return;
+  }
+  try {
+    const oids = await getRawClassOids(
+      req.identity!.source,
+      req.user!,
+      req.graphToken!
+    );
+    const named = await resolveClassDisplayNames(oids, req.graphToken!);
+    res.json({ classes: named });
+  } catch (err) {
+    proxmoxErrorResponse(res, err);
+  }
+});
+
+async function patchTemplateTags(
+  vmid: number,
+  identity: BridgeIdentity,
+  modify: (tags: string[]) => string[]
+): Promise<VM> {
+  const { templates } = await listAllProxmoxVms();
+  const tpl = templates.find((t) => t.vmid === vmid);
+  if (!tpl) throw Object.assign(new Error("Template not found"), { httpStatus: 404 });
+
+  const ownerOid = tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX);
+  const allowed = isAdmin(identity) || (ownerOid && ownerOid === identity.oid);
+  if (!allowed) {
+    throw Object.assign(new Error("Not the owner"), { httpStatus: 403 });
+  }
+  const newTags = modify([...tpl.tags]);
+  await proxmox!.updateConfig(tpl.node, tpl.vmid, { tags: newTags });
+  return { ...tpl, tags: newTags };
+}
+
+// Lehrer/Admin uebernehmen ein noch ungeclaimtes Template -- setzt tpl-owner-<self>.
+app.post("/api/templates/:vmid/claim", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  if (!isTeacher(req.identity!) && !isAdmin(req.identity!)) {
+    res.status(403).json({ error: "Nur Lehrer/Admin" });
+    return;
+  }
+  try {
+    const vmid = Number(req.params.vmid);
+    if (!Number.isFinite(vmid)) {
+      res.status(400).json({ error: "vmid must be a number" });
+      return;
+    }
+    const { templates } = await listAllProxmoxVms();
+    const tpl = templates.find((t) => t.vmid === vmid);
+    if (!tpl) {
+      res.status(404).json({ error: "Template not found" });
+      return;
+    }
+    const currentOwner = tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX);
+    if (currentOwner && currentOwner !== req.identity!.oid && !isAdmin(req.identity!)) {
+      res.status(409).json({
+        error: "Template hat bereits einen Owner",
+        ownerOid: currentOwner,
+      });
+      return;
+    }
+    const newTags = tpl.tags.filter((t) => !t.startsWith(TAG.TPL_OWNER_PREFIX));
+    if (!hasTag(newTags, TAG.TPL_MARKER)) newTags.push(TAG.TPL_MARKER);
+    newTags.push(`${TAG.TPL_OWNER_PREFIX}${req.identity!.oid}`);
+    await proxmox!.updateConfig(tpl.node, tpl.vmid, { tags: newTags });
+    res.json(templateDTO({ ...tpl, tags: newTags }));
+  } catch (err) {
+    proxmoxErrorResponse(res, err);
+  }
+});
+
+// Owner gibt das Template frei -- entfernt tpl-owner-* und (optional) das
+// public-Flag + alle class-Zuweisungen, damit es wieder claimable wird.
+app.post("/api/templates/:vmid/release", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  try {
+    const vmid = Number(req.params.vmid);
+    const updated = await patchTemplateTags(vmid, req.identity!, (tags) =>
+      tags.filter((t) => !t.startsWith(TAG.TPL_OWNER_PREFIX))
+    );
+    res.json(templateDTO(updated));
+  } catch (err: unknown) {
+    const e = err as { httpStatus?: number; message?: string };
+    if (e?.httpStatus) {
+      res.status(e.httpStatus).json({ error: e.message });
+      return;
+    }
+    proxmoxErrorResponse(res, err);
+  }
+});
+
+// Public-Flag + Klassen-Zuweisung aktualisieren. Body: { isPublic?, classes? }
+app.patch("/api/templates/:vmid", requireAuth, requireIdentity, async (req, res) => {
+  if (!requireProxmox(res)) return;
+  try {
+    const vmid = Number(req.params.vmid);
+    const { isPublic, classes } = req.body ?? {};
+    if (
+      isPublic === undefined &&
+      classes === undefined
+    ) {
+      res.status(400).json({ error: "isPublic oder classes muss gesetzt sein" });
+      return;
+    }
+    if (classes !== undefined && !Array.isArray(classes)) {
+      res.status(400).json({ error: "classes muss ein Array von OIDs sein" });
+      return;
+    }
+    const updated = await patchTemplateTags(vmid, req.identity!, (tags) => {
+      let next = tags;
+      if (isPublic !== undefined) {
+        next = next.filter((t) => t !== TAG.TPL_PUBLIC);
+        if (isPublic) next.push(TAG.TPL_PUBLIC);
+      }
+      if (classes !== undefined) {
+        next = next.filter((t) => !t.startsWith(TAG.TPL_CLASS_PREFIX));
+        for (const oid of classes as string[]) {
+          if (typeof oid === "string" && oid.length > 0) {
+            next.push(`${TAG.TPL_CLASS_PREFIX}${oid}`);
+          }
+        }
+      }
+      return next;
+    });
+    // Klassen-Cache invalidieren — sonst sieht /api/me die neue Klasse erst nach 5 min.
+    clearActiveClassCache();
+    res.json(templateDTO(updated));
+  } catch (err: unknown) {
+    const e = err as { httpStatus?: number; message?: string };
+    if (e?.httpStatus) {
+      res.status(e.httpStatus).json({ error: e.message });
+      return;
+    }
+    proxmoxErrorResponse(res, err);
+  }
 });
 
 app.get("/api/templates", requireAuth, requireIdentity, async (req, res) => {
