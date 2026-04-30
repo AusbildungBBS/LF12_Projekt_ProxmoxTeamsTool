@@ -28,6 +28,14 @@ const AUTH_MODE = (process.env.AUTH_MODE ?? "auto").toLowerCase() as
   | "edu"
   | "auto";
 
+// Proxmox-Connection-Konstanten (oben, weil mehrere Helfer sie referenzieren).
+const PROXMOX_URL = process.env.PROXMOX_URL ?? "";
+const PROXMOX_TOKEN_ID = process.env.PROXMOX_TOKEN_ID ?? "";
+const PROXMOX_TOKEN_SECRET = process.env.PROXMOX_TOKEN_SECRET ?? "";
+const PROXMOX_TLS_INSECURE =
+  (process.env.PROXMOX_TLS_REJECT_UNAUTHORIZED ?? "true").toLowerCase() ===
+  "false";
+
 // Proxmox client (null if env not configured — bridge then skips class filter).
 const proxmox = createProxmoxClientFromEnv();
 if (proxmox) {
@@ -474,7 +482,11 @@ function templateDTO(tpl: VM) {
   };
 }
 
-function vmDTO(vm: VM, templatesByVmid?: Map<number, VM>) {
+function vmDTO(
+  vm: VM,
+  templatesByVmid: Map<number, VM> | undefined,
+  avg?: { cpuAvg5m: number; memAvg5m: number }
+) {
   const srcId = Number(tagValue(vm.tags, TAG.VM_TPL_PREFIX)) || null;
   const srcTpl = srcId && templatesByVmid ? templatesByVmid.get(srcId) : undefined;
   return {
@@ -490,9 +502,69 @@ function vmDTO(vm: VM, templatesByVmid?: Map<number, VM>) {
     maxmem: vm.maxmem,
     cpu: vm.cpu,
     mem: vm.mem,
+    cpuAvg5m: avg?.cpuAvg5m,
+    memAvg5m: avg?.memAvg5m,
     uptime: vm.uptime,
     tags: vm.tags,
   };
+}
+
+const RRD_CACHE_TTL_MS = 30_000;
+const rrdCache = new Map<
+  number,
+  { cpuAvg5m: number; memAvg5m: number; expiresAt: number }
+>();
+
+// 5-Minuten-Durchschnitt aus Proxmox-RRD. timeframe=hour liefert Punkte
+// im 30-Sekunden-Raster, die letzten 10 davon sind also ~5 min.
+async function getVmAvg5m(
+  node: string,
+  vmid: number
+): Promise<{ cpuAvg5m: number; memAvg5m: number } | null> {
+  const cached = rrdCache.get(vmid);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { cpuAvg5m: cached.cpuAvg5m, memAvg5m: cached.memAvg5m };
+  }
+  try {
+    const r = await axios.get<{
+      data: Array<{ time: number; cpu?: number; mem?: number; maxmem?: number }>;
+    }>(
+      `${PROXMOX_URL.replace(/\/+$/, "")}/api2/json/nodes/${node}/qemu/${vmid}/rrddata?timeframe=hour&cf=AVERAGE`,
+      {
+        headers: {
+          Authorization: `PVEAPIToken=${PROXMOX_TOKEN_ID}=${PROXMOX_TOKEN_SECRET}`,
+        },
+        httpsAgent: new https.Agent({ rejectUnauthorized: !PROXMOX_TLS_INSECURE }),
+        timeout: 8000,
+      }
+    );
+    const points = r.data?.data ?? [];
+    const recent = points.slice(-10);
+    const cpus = recent
+      .map((p) => p.cpu)
+      .filter((c): c is number => typeof c === "number");
+    const mems = recent
+      .map((p) => p.mem)
+      .filter((m): m is number => typeof m === "number");
+    const cpuAvg5m = cpus.length
+      ? cpus.reduce((a, b) => a + b, 0) / cpus.length
+      : 0;
+    const memAvg5m = mems.length
+      ? mems.reduce((a, b) => a + b, 0) / mems.length
+      : 0;
+    rrdCache.set(vmid, {
+      cpuAvg5m,
+      memAvg5m,
+      expiresAt: Date.now() + RRD_CACHE_TTL_MS,
+    });
+    return { cpuAvg5m, memAvg5m };
+  } catch (e) {
+    console.warn(
+      `[bridge] RRD fetch for vm ${vmid} failed:`,
+      e instanceof Error ? e.message : e
+    );
+    return null;
+  }
 }
 
 async function listAllProxmoxVms(): Promise<{
@@ -725,14 +797,30 @@ app.get("/api/templates", requireAuth, requireIdentity, async (req, res) => {
   }
 });
 
+async function buildVmDTOsWithAvg(
+  vms: VM[],
+  templatesByVmid: Map<number, VM>
+) {
+  // RRD-Calls fuer running VMs parallelisieren. Der Cache (30 s) faengt
+  // Auto-Refresh-Bursts ab, sodass nicht jeder Request 10 RRD-Calls schiesst.
+  return Promise.all(
+    vms.map(async (v) => {
+      if (v.status !== "running") return vmDTO(v, templatesByVmid);
+      const avg = await getVmAvg5m(v.node, v.vmid);
+      return vmDTO(v, templatesByVmid, avg ?? undefined);
+    })
+  );
+}
+
 app.get("/api/vms", requireAuth, requireIdentity, async (req, res) => {
   if (!requireProxmox(res)) return;
   try {
     const { vms, templatesByVmid } = await listAllProxmoxVms();
-    const visible = vms
-      .filter((v) => canSeeVm(v, req.identity!, templatesByVmid))
-      .map((v) => vmDTO(v, templatesByVmid));
-    res.json({ vms: visible });
+    const visibleVms = vms.filter((v) =>
+      canSeeVm(v, req.identity!, templatesByVmid)
+    );
+    const dtos = await buildVmDTOsWithAvg(visibleVms, templatesByVmid);
+    res.json({ vms: dtos });
   } catch (err) {
     proxmoxErrorResponse(res, err);
   }
@@ -1095,12 +1183,6 @@ if (process.env.NODE_ENV !== "production") {
 //     im Query + API-Token im Authorization-Header, tunnels Binary-Frames.
 //  4. noVNC im Frontend nutzt den ticket als RFB-Password -- Proxmox-VNC
 //     macht VncAuth gegen genau diesen ticket-string.
-
-const PROXMOX_URL = process.env.PROXMOX_URL ?? "";
-const PROXMOX_TOKEN_ID = process.env.PROXMOX_TOKEN_ID ?? "";
-const PROXMOX_TOKEN_SECRET = process.env.PROXMOX_TOKEN_SECRET ?? "";
-const PROXMOX_TLS_INSECURE =
-  (process.env.PROXMOX_TLS_REJECT_UNAUTHORIZED ?? "true").toLowerCase() === "false";
 
 const VNC_SESSION_TTL_MS = 60_000;
 interface VncSession {

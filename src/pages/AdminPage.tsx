@@ -10,17 +10,22 @@ import {
 
 function VmStatsPill({ vm }: { vm: VmDTO }) {
   if (vm.status !== "running") return null;
-  const cpuPct = Math.round((vm.cpu ?? 0) * 100);
-  const memUsedMb = vm.mem ? Math.round(vm.mem / 1024 / 1024) : 0;
+  const cpu = vm.cpuAvg5m ?? vm.cpu ?? 0;
+  const mem = vm.memAvg5m ?? vm.mem ?? 0;
+  const cpuPct = Math.round(cpu * 100);
+  const memUsedMb = Math.round(mem / 1024 / 1024);
   const memMaxMb = vm.maxmem ? Math.round(vm.maxmem / 1024 / 1024) : 0;
   const memPct = memMaxMb > 0 ? Math.round((memUsedMb / memMaxMb) * 100) : 0;
   return (
-    <span className="stats-pill">
+    <span
+      className="stats-pill"
+      title={vm.cpuAvg5m !== undefined ? "Durchschnitt letzte 5 min" : "current"}
+    >
       <span className={`pill-chip ${cpuPct > 85 ? "hot" : cpuPct > 60 ? "warm" : ""}`}>
-        CPU {cpuPct}%
+        CPU {cpuPct}% Ø5m
       </span>
       <span className={`pill-chip ${memPct > 85 ? "hot" : memPct > 60 ? "warm" : ""}`}>
-        RAM {memUsedMb}/{memMaxMb} MB
+        RAM {memUsedMb}/{memMaxMb} MB Ø5m
       </span>
     </span>
   );

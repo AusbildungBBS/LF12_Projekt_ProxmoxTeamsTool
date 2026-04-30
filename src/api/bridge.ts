@@ -23,9 +23,11 @@ export interface VmDTO {
   cpus?: number;
   maxmem?: number;
   // Live-Stats — nur fuer running VMs gesetzt.
-  cpu?: number;      // 0..1 (1.0 == alle vCPUs voll ausgelastet)
-  mem?: number;      // bytes
-  uptime?: number;   // Sekunden
+  cpu?: number;          // 0..1 (current, ~Wenige-Sekunden-Mittel)
+  mem?: number;          // bytes (current)
+  cpuAvg5m?: number;     // 0..1 (Durchschnitt letzte ~5 min, aus Proxmox-RRD)
+  memAvg5m?: number;     // bytes (Durchschnitt letzte ~5 min)
+  uptime?: number;       // Sekunden
   tags: string[];
 }
 
