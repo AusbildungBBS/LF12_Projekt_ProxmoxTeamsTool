@@ -155,18 +155,20 @@ export function TemplatesPage() {
                 </div>
 
                 <div className="card-actions icon-actions">
-                  {isStudent && (
-                    <button
-                      className="icon-button"
-                      aria-label="VM aus diesem Template erstellen"
-                      data-tooltip="VM aus diesem Template erstellen"
-                      title="VM aus diesem Template erstellen"
-                      onClick={() => instantiate(t)}
-                      disabled={busyId === t.vmid}
-                    >
-                      {busyId === t.vmid ? "…" : "➕"}
-                    </button>
-                  )}
+                  <button
+                    className="icon-button"
+                    aria-label="VM aus diesem Template erstellen"
+                    data-tooltip={
+                      isStudent
+                        ? "VM aus diesem Template erstellen (max. eine pro Template)"
+                        : "VM aus diesem Template erstellen (Test/Demo)"
+                    }
+                    title="VM aus diesem Template erstellen"
+                    onClick={() => instantiate(t)}
+                    disabled={busyId === t.vmid}
+                  >
+                    {busyId === t.vmid ? "…" : "➕"}
+                  </button>
 
                   {canManage && !t.ownerOid && (
                     <button
