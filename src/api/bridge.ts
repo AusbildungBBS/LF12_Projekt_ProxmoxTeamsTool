@@ -44,11 +44,14 @@ export interface TaskRef {
 }
 
 export function useBridgeApi() {
-  const { accessToken } = useAuth();
+  const { accessToken, impersonatedRole } = useAuth();
   return useMemo(() => {
     const baseHeaders: Record<string, string> = accessToken
       ? { Authorization: `Bearer ${accessToken}` }
       : {};
+    if (impersonatedRole) {
+      baseHeaders["X-Impersonate-Role"] = impersonatedRole;
+    }
 
     async function call<T>(url: string, init?: RequestInit): Promise<T> {
       const headers: Record<string, string> = { ...baseHeaders };

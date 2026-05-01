@@ -134,6 +134,9 @@ export function DevFakeAuthProvider({
         getToken: async () => "dev-fake-token",
         loading: false,
         error: null,
+        realIsAdmin: role === "admin",
+        impersonatedRole: null,
+        setImpersonatedRole: () => {},
       }}
     >
       <DevAuthBanner role={role} />

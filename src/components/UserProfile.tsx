@@ -11,6 +11,9 @@ export function UserProfile() {
     logout,
     loading,
     error,
+    realIsAdmin,
+    impersonatedRole,
+    setImpersonatedRole,
   } = useAuth();
 
   if (loading) {
@@ -64,7 +67,26 @@ export function UserProfile() {
             </span>
           ))
         )}
+        {impersonatedRole && <span className="badge badge-impersonate">impersonating</span>}
       </div>
+      {realIsAdmin && (
+        <label className="impersonate-select" title="Demo: andere Rolle aufsetzen">
+          View as:
+          <select
+            value={impersonatedRole ?? "Proxmox.Admin"}
+            onChange={(e) => {
+              const v = e.target.value;
+              setImpersonatedRole(v === "Proxmox.Admin" ? null : (v as
+                | "Proxmox.Teacher"
+                | "Proxmox.Student"));
+            }}
+          >
+            <option value="Proxmox.Admin">Admin (echt)</option>
+            <option value="Proxmox.Teacher">Lehrer</option>
+            <option value="Proxmox.Student">Schueler</option>
+          </select>
+        </label>
+      )}
       <button onClick={logout} className="btn btn-sm">
         Sign out
       </button>

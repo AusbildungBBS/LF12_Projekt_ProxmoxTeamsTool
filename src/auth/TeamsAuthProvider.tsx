@@ -29,6 +29,8 @@ export interface BridgeIdentity {
   source: "standard" | "edu";
 }
 
+type ImpersonatedRole = "Proxmox.Admin" | "Proxmox.Teacher" | "Proxmox.Student";
+
 interface AuthContextType {
   isInTeams: boolean;
   isAuthenticated: boolean;
@@ -44,6 +46,13 @@ interface AuthContextType {
   getToken: () => Promise<string | null>;
   loading: boolean;
   error: string | null;
+  // Demo-Impersonation: ein echter Admin kann eine andere Rolle "aufsetzen".
+  // realIsAdmin gibt zurueck, ob der angemeldete User WIRKLICH Admin ist
+  // (unabhaengig von der Impersonation), damit das Switcher-UI nur fuer
+  // echte Admins angezeigt wird.
+  realIsAdmin: boolean;
+  impersonatedRole: ImpersonatedRole | null;
+  setImpersonatedRole: (r: ImpersonatedRole | null) => void;
 }
 
 export const AuthContext = createContext<AuthContextType>({
@@ -61,6 +70,9 @@ export const AuthContext = createContext<AuthContextType>({
   getToken: async () => null,
   loading: true,
   error: null,
+  realIsAdmin: false,
+  impersonatedRole: null,
+  setImpersonatedRole: () => {},
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -79,16 +91,22 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<BridgeIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [impersonatedRole, setImpersonatedRole] = useState<ImpersonatedRole | null>(
+    null
+  );
 
   const user = accounts[0] ?? null;
   const isAuthenticated = !!user;
 
-  // Roles come from the bridge-resolved identity (works for both standard and
-  // edu auth modes). Fall back to ID-token roles while /api/me is still loading,
-  // so the UI doesn't flash an empty role between login and first response.
+  // Echte Roles aus ID-Token (immer, ohne Impersonation), damit das Switcher-
+  // UI in der Profile-Bar erkennt ob der User wirklich Admin ist.
   const idTokenRoles =
     (user?.idTokenClaims as { roles?: string[] } | undefined)?.roles ?? [];
-  const roles = identity?.roles ?? idTokenRoles;
+  const realRoles = identity?.roles ?? idTokenRoles;
+  const realIsAdmin = realRoles.includes("Proxmox.Admin");
+
+  // Die "gefuehlten" Roles fuer die UI: bei aktiver Impersonation ueberschrieben.
+  const roles = impersonatedRole ? [impersonatedRole] : realRoles;
   const classes = identity?.classes ?? [];
   const hasRole = (role: string) => roles.includes(role);
 
@@ -137,7 +155,9 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       });
   }, [user, accessToken, instance]);
 
-  // Once we have an access token, fetch profile + identity from the backend
+  // Once we have an access token, fetch profile + identity from the backend.
+  // Re-fetcht bei Impersonation-Switch, damit die Server-seitig gerechnete
+  // Identity (Klassen-Filter etc.) zur impersonierten Rolle passt.
   useEffect(() => {
     if (!accessToken) {
       setProfile(null);
@@ -147,9 +167,11 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/me", {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        });
+        const headers: Record<string, string> = {
+          Authorization: `Bearer ${accessToken}`,
+        };
+        if (impersonatedRole) headers["X-Impersonate-Role"] = impersonatedRole;
+        const res = await fetch("/api/me", { headers });
         if (!res.ok) {
           console.error("Failed to fetch /api/me:", res.status, await res.text());
           return;
@@ -166,7 +188,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [accessToken]);
+  }, [accessToken, impersonatedRole]);
 
   /**
    * Teams SSO: get a token silently from Teams client.
@@ -258,6 +280,9 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         getToken,
         loading,
         error,
+        realIsAdmin,
+        impersonatedRole,
+        setImpersonatedRole,
       }}
     >
       {children}

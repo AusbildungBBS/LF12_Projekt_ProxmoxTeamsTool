@@ -361,12 +361,29 @@ async function requireIdentity(
   }
   try {
     req.graphToken = await exchangeForGraphToken(req.rawToken);
-    req.identity = await resolveIdentity(req.user!, req.graphToken);
+    const realIdentity = await resolveIdentity(req.user!, req.graphToken);
+    req.identity = maybeImpersonate(realIdentity, req);
     next();
   } catch (err) {
     console.error("[bridge] identity resolution failed:", err);
     res.status(500).json({ error: "identity resolution failed" });
   }
+}
+
+// Dev-Impersonation: nur in non-prod und nur wenn der echte Anrufer Admin ist.
+// Erlaubt einen einzelnen App-Role-Header, der die Rolle fuer diese Request
+// ueberschreibt -- praktisch fuer Demo-Screenshots.
+function maybeImpersonate(
+  real: BridgeIdentity,
+  req: express.Request
+): BridgeIdentity {
+  if (process.env.NODE_ENV === "production") return real;
+  const wanted = req.header("X-Impersonate-Role");
+  if (!wanted) return real;
+  if (!real.roles.includes("Proxmox.Admin")) return real;
+  const allowed = ["Proxmox.Admin", "Proxmox.Teacher", "Proxmox.Student"];
+  if (!allowed.includes(wanted)) return real;
+  return { ...real, roles: [wanted as AppRole] };
 }
 
 function isAdmin(id: BridgeIdentity): boolean {
