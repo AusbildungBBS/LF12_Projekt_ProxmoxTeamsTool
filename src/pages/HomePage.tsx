@@ -30,7 +30,7 @@ function VmStatsPill({ vm }: { vm: VmDTO }) {
 }
 
 export function HomePage() {
-  const { isAuthenticated, hasRole, roles, accessToken, identity } = useAuth();
+  const { isAuthenticated, hasRole, roles, accessToken, identity, impersonatedRole } = useAuth();
   const api = useBridgeApi();
   const isAdmin = hasRole("Proxmox.Admin");
   const isTeacher = hasRole("Proxmox.Teacher");
@@ -64,6 +64,16 @@ export function HomePage() {
     if (!accessToken) return;
     refresh();
   }, [accessToken, refresh]);
+
+  // Beim Wechsel der impersonierten Rolle: alte Daten sofort verwerfen,
+  // damit die UI nicht 1-2 Sekunden lang stale Admin-Daten zeigt, bevor
+  // der refresh() durch ist. classes auf null setzen triggert das
+  // "Lade ..."-Empty-State.
+  useEffect(() => {
+    setClasses(null);
+    setTemplates([]);
+    setVms([]);
+  }, [impersonatedRole]);
 
   useEffect(() => {
     const anyRunning = vms.some((v) => v.status === "running");
