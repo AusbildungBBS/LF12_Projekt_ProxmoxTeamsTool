@@ -91,9 +91,22 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<BridgeIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [impersonatedRole, setImpersonatedRole] = useState<ImpersonatedRole | null>(
-    null
+  const IMPERSONATE_KEY = "pttool.impersonate";
+  const [impersonatedRole, setImpersonatedRoleState] = useState<ImpersonatedRole | null>(
+    () => {
+      if (typeof window === "undefined") return null;
+      const v = localStorage.getItem(IMPERSONATE_KEY);
+      if (v === "Proxmox.Admin" || v === "Proxmox.Teacher" || v === "Proxmox.Student") {
+        return v;
+      }
+      return null;
+    }
   );
+  const setImpersonatedRole = (r: ImpersonatedRole | null) => {
+    setImpersonatedRoleState(r);
+    if (r) localStorage.setItem(IMPERSONATE_KEY, r);
+    else localStorage.removeItem(IMPERSONATE_KEY);
+  };
 
   const user = accounts[0] ?? null;
   const isAuthenticated = !!user;

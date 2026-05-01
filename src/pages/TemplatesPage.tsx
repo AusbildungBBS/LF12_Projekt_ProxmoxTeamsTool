@@ -126,7 +126,10 @@ export function TemplatesPage() {
       {templates && templates.length > 0 && (
         <ul className="card-list">
           {templates.map((t) => {
-            const isOwn = identity?.oid === t.ownerOid;
+            // "isOwn" nur, wenn der User auch managen darf -- sonst zeigen
+            // wir einem Schueler, der zufaellig die gleiche OID wie der Owner
+            // hat (oder in Impersonation-Demos), keine Edit-Buttons.
+            const isOwn = !!t.ownerOid && identity?.oid === t.ownerOid && canManage;
             // Edit-Buttons (Public / Classes / Release) brauchen einen Owner,
             // sonst gibt's nichts zu freizugeben und Public/Classes-Setzen waere
             // ein verkappter Claim. Solange ungeclaimt, ist die einzige
