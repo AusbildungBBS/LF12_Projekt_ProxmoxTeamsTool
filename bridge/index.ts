@@ -12,6 +12,20 @@ import { createProxmoxClientFromEnv } from "./proxmox";
 import type { VM, VMID } from "./proxmox";
 import { filterToActiveClasses, clearActiveClassCache } from "./classes";
 import { TAG, tagValue, tagValues, hasTag } from "./tags";
+import {
+  type AppRole,
+  type BridgeIdentity,
+  isAdmin,
+  isTeacher,
+  isStudent,
+  canSeeTemplate,
+  canSeeVm,
+  canModifyVm,
+  mapEduRoleToAppRoles,
+  filterAppRoles,
+  applyImpersonation,
+} from "./authz";
+import { buildVmName } from "./naming";
 
 dotenv.config();
 
@@ -113,17 +127,6 @@ export interface BridgeClaims extends JwtPayload {
   scp?: string;
   _claim_names?: { groups?: string };
   _claim_sources?: Record<string, { endpoint?: string }>;
-}
-
-export type AppRole = "Proxmox.Admin" | "Proxmox.Teacher" | "Proxmox.Student";
-
-export interface BridgeIdentity {
-  oid: string;
-  name: string;
-  email: string;
-  roles: AppRole[];
-  classes: string[];
-  source: "standard" | "edu";
 }
 
 function verifyToken(token: string): Promise<BridgeClaims> {
@@ -310,24 +313,6 @@ async function detectMode(
   return mode;
 }
 
-function mapEduRoleToAppRoles(primaryRole?: string): AppRole[] {
-  switch (primaryRole) {
-    case "teacher":
-    case "faculty":
-      return ["Proxmox.Teacher"];
-    case "student":
-      return ["Proxmox.Student"];
-    default:
-      return [];
-  }
-}
-
-function filterAppRoles(roles: string[] | undefined): AppRole[] {
-  if (!roles) return [];
-  const allowed: AppRole[] = ["Proxmox.Admin", "Proxmox.Teacher", "Proxmox.Student"];
-  return roles.filter((r): r is AppRole => allowed.includes(r as AppRole));
-}
-
 async function getRawClassOids(
   source: "standard" | "edu",
   claims: BridgeClaims,
@@ -453,78 +438,11 @@ function maybeImpersonate(
   real: BridgeIdentity,
   req: express.Request
 ): BridgeIdentity {
-  if (process.env.NODE_ENV === "production") return real;
-  const wanted = req.header("X-Impersonate-Role");
-  if (!wanted) return real;
-  if (!real.roles.includes("Proxmox.Admin")) return real;
-  const allowed = ["Proxmox.Admin", "Proxmox.Teacher", "Proxmox.Student"];
-  if (!allowed.includes(wanted)) return real;
-  return { ...real, roles: [wanted as AppRole] };
-}
-
-function isAdmin(id: BridgeIdentity): boolean {
-  return id.roles.includes("Proxmox.Admin");
-}
-function isTeacher(id: BridgeIdentity): boolean {
-  return id.roles.includes("Proxmox.Teacher");
-}
-function isStudent(id: BridgeIdentity): boolean {
-  return id.roles.includes("Proxmox.Student");
-}
-
-// Visibility — read access
-function canSeeTemplate(tpl: VM, id: BridgeIdentity): boolean {
-  if (isAdmin(id)) return true;
-  if (isTeacher(id)) {
-    const ownerOid = tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX);
-    // Ungeclaimte Templates sind fuer jeden Lehrer sichtbar -- sonst koennte
-    // er sie nicht via UI claimen.
-    if (!ownerOid) return true;
-    if (ownerOid === id.oid) return true;
-    if (hasTag(tpl.tags, TAG.TPL_PUBLIC)) return true;
-    const tplClasses = tagValues(tpl.tags, TAG.TPL_CLASS_PREFIX);
-    return tplClasses.some((c) => id.classes.includes(c));
-  }
-  if (isStudent(id)) {
-    const tplClasses = tagValues(tpl.tags, TAG.TPL_CLASS_PREFIX);
-    return tplClasses.some((c) => id.classes.includes(c));
-  }
-  return false;
-}
-
-function canSeeVm(
-  vm: VM,
-  id: BridgeIdentity,
-  templatesByVmid: Map<number, VM>
-): boolean {
-  if (isAdmin(id)) return true;
-  if (isStudent(id)) {
-    return tagValue(vm.tags, TAG.VM_OWNER_PREFIX) === id.oid;
-  }
-  if (isTeacher(id)) {
-    const srcId = tagValue(vm.tags, TAG.VM_TPL_PREFIX);
-    if (!srcId) return false;
-    const srcTpl = templatesByVmid.get(Number(srcId));
-    if (!srcTpl) return false;
-    const tplClasses = tagValues(srcTpl.tags, TAG.TPL_CLASS_PREFIX);
-    return tplClasses.some((c) => id.classes.includes(c));
-  }
-  return false;
-}
-
-function canModifyVm(
-  vm: VM,
-  id: BridgeIdentity,
-  templatesByVmid: Map<number, VM>
-): boolean {
-  if (isAdmin(id)) return true;
-  if (isStudent(id)) {
-    return tagValue(vm.tags, TAG.VM_OWNER_PREFIX) === id.oid;
-  }
-  if (isTeacher(id)) {
-    return canSeeVm(vm, id, templatesByVmid);
-  }
-  return false;
+  return applyImpersonation(
+    real,
+    req.header("X-Impersonate-Role"),
+    process.env.NODE_ENV === "production"
+  );
 }
 
 // ── Routes ─────────────────────────────────────────────────────────────────────
@@ -991,10 +909,7 @@ app.post("/api/vms/from-template/:templateId", requireAuth, requireIdentity, asy
     }
     // VMID picken
     const nextId = await pickFreeVmid();
-    const safeName = `${id.email.split("@")[0]}-tpl${templateId}-${nextId}`
-      .toLowerCase()
-      .replace(/[^a-z0-9-]/g, "-")
-      .slice(0, 60);
+    const safeName = buildVmName(id.email, templateId, nextId);
     const task = await proxmox!.cloneFromTemplate(tpl.node, tpl.vmid, {
       newid: nextId,
       name: safeName,
