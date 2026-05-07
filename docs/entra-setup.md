@@ -4,6 +4,8 @@ Ohne diese Schritte funktioniert kein Login. Das Frontend holt via MSAL ein Acce
 
 > Die Anleitung beschreibt den Stand für lokale Entwicklung (`http://localhost:5173`). Für Produktion zusätzlich die echte Redirect-URI eintragen.
 
+> **Single-Tenant ist Pflicht.** Die Bridge ist bewusst auf **einen** Tenant festgenagelt: `AZURE_TENANT_ID` muss die konkrete **Directory-(Tenant-)GUID** sein. Fehlt sie oder steht dort eine Multi-Tenant-Authority (`common` / `organizations` / `consumers`), **startet die Bridge nicht** (harter Abbruch beim Boot). Zusätzlich prüft die Bridge bei jedem Token den `tid`-Claim gegen diese GUID. Ein Konto aus einer fremden Organisation bekommt so `401 Invalid token` bzw. `403` mit `code: wrong_tenant` — siehe [bridge/index.ts](../bridge/index.ts).
+
 ## Tenant-Typ wählen — Standard vs. EDU
 
 Die Bridge unterstützt **zwei Wege**, Rollen + Klassen für einen User aufzulösen. Steuerung via `AUTH_MODE` in der `.env`:
@@ -143,6 +145,9 @@ AZURE_CLIENT_SECRET=<secret-value-aus-schritt-6>
 - **Bridge `401 Invalid token` mit `jwt issuer invalid` im Bridge-Log:** Schritt 2a (Token-Version auf v2) fehlt — Token kommt als v1 raus.
 - **`roles`-Claim fehlt:** User ist der App nicht zugewiesen (Schritt 3, Enterprise Applications).
 - **`groups`-Claim fehlt oder hat „overage":** Schritt 4, Format ist „Groups assigned to the application", nicht „All".
+- **Bridge startet nicht, Log `FATAL: AZURE_TENANT_ID … required` bzw. `… is a multi-tenant authority`:** `AZURE_TENANT_ID` fehlt oder ist `common`/`organizations`/`consumers` — die Bridge erzwingt Single-Tenant. Konkrete Directory-(Tenant-)GUID eintragen.
+- **Bridge `403` mit `code: wrong_tenant`:** Token stammt aus einem anderen Tenant als `AZURE_TENANT_ID`.
+- **Bridge `403` mit `code: not_provisioned`:** Token ist gültig + im richtigen Tenant, aber der OBO-/Graph-Call scheitert (kein Admin-Consent, externer Gast, nicht zugewiesen) — siehe Schritt 5/6.
 
 ## Was wir bewusst *nicht* automatisieren
 
