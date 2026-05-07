@@ -45,14 +45,41 @@ if (proxmox) {
 }
 
 if (!TENANT_ID || !CLIENT_ID) {
-  console.warn(
-    "[bridge] Missing AZURE_TENANT_ID / AZURE_CLIENT_ID — token validation will fail until set."
+  console.error(
+    "[bridge] FATAL: AZURE_TENANT_ID and AZURE_CLIENT_ID are required — " +
+      "single-tenant token validation cannot work without a concrete tenant. Refusing to start."
   );
+  process.exit(1);
+}
+
+// Der Tenant IST das Schloss: mit einer Multi-Tenant-Authority würden Tokens aus
+// JEDEM Entra-Tenant die Issuer-Pruefung passieren und die Org-Grenze verschwindet.
+// Darum harter Boot-Abbruch, wenn TENANT_ID ein Multi-Tenant-Platzhalter ist.
+const MULTI_TENANT_AUTHORITIES = new Set(["common", "organizations", "consumers"]);
+if (MULTI_TENANT_AUTHORITIES.has(TENANT_ID.toLowerCase())) {
+  console.error(
+    `[bridge] FATAL: AZURE_TENANT_ID="${TENANT_ID}" is a multi-tenant authority. ` +
+      "Set the concrete tenant GUID (the iss/tid claims are always the GUID, never a domain) so only your org can sign in. Refusing to start."
+  );
+  process.exit(1);
 }
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+
+// Getypter Auth-Fehler, damit die Middleware einen aussagekraeftigen Status/Code
+// liefern kann, statt jeden Fehlschlag auf "Invalid token" / 500 zu kollabieren.
+class AuthError extends Error {
+  constructor(
+    public status: number,
+    public code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = "AuthError";
+  }
+}
 
 // ── JWKS / Token Validation ────────────────────────────────────────────────────
 
@@ -78,6 +105,7 @@ function getSigningKey(header: jwt.JwtHeader, cb: jwt.SigningKeyCallback) {
 
 export interface BridgeClaims extends JwtPayload {
   oid?: string;
+  tid?: string;
   preferred_username?: string;
   name?: string;
   roles?: string[];
@@ -104,7 +132,7 @@ function verifyToken(token: string): Promise<BridgeClaims> {
     // Accept both so the bridge works regardless of the App Registration's
     // `requestedAccessTokenVersion` setting. Override with API_AUDIENCE if a
     // custom Application ID URI is configured in Entra.
-    const audience = API_AUDIENCE
+    const audience: [string, ...string[]] | undefined = API_AUDIENCE
       ? [API_AUDIENCE]
       : CLIENT_ID
         ? [`api://${CLIENT_ID}`, CLIENT_ID]
@@ -123,7 +151,17 @@ function verifyToken(token: string): Promise<BridgeClaims> {
           reject(err || new Error("Invalid token"));
           return;
         }
-        resolve(decoded as BridgeClaims);
+        const claims = decoded as BridgeClaims;
+        // Defense-in-depth: `issuer` oben pinnt den Tenant bereits, aber wir
+        // pruefen den `tid`-Claim zusaetzlich explizit, damit ein Config-Drift
+        // niemals stillschweigend ein org-fremdes Token durchlaesst.
+        if (claims.tid !== TENANT_ID) {
+          reject(
+            new AuthError(403, "wrong_tenant", "Token was issued for a different tenant")
+          );
+          return;
+        }
+        resolve(claims);
       }
     );
   });
@@ -158,7 +196,24 @@ async function requireAuth(
     next();
   } catch (err) {
     console.error("[bridge] token validation failed:", err);
-    res.status(401).json({ error: "Invalid token" });
+    // Unterscheidbarer Status/Code statt pauschalem 401, damit ein org-fremder /
+    // abgelaufener / falsch-adressierter Aufrufer (und unsere Support-Logs) die
+    // Faelle auseinanderhalten kann. Die Bridge ist single-tenant (Boot-Guard).
+    if (err instanceof AuthError) {
+      res.status(err.status).json({ error: err.message, code: err.code });
+      return;
+    }
+    const name = err instanceof Error ? err.name : "";
+    const msg = err instanceof Error ? err.message : "";
+    if (name === "TokenExpiredError") {
+      res.status(401).json({ error: "Token expired", code: "token_expired" });
+    } else if (/issuer/i.test(msg)) {
+      res.status(403).json({ error: "Token from an unexpected tenant", code: "wrong_tenant" });
+    } else if (/audience/i.test(msg)) {
+      res.status(401).json({ error: "Token has wrong audience", code: "bad_audience" });
+    } else {
+      res.status(401).json({ error: "Invalid token", code: "invalid_token" });
+    }
   }
 }
 
@@ -204,7 +259,7 @@ async function exchangeForGraphToken(userToken: string): Promise<string> {
     throw new Error("Bridge not configured: missing Azure credentials");
   }
 
-  const tokenEndpoint = `https://login.microsoftonline.com/${TENANT_ID || "common"}/oauth2/v2.0/token`;
+  const tokenEndpoint = `https://login.microsoftonline.com/${TENANT_ID}/oauth2/v2.0/token`;
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
     client_secret: CLIENT_SECRET,
@@ -341,7 +396,7 @@ async function resolveIdentity(
   claims: BridgeClaims,
   graphToken: string
 ): Promise<BridgeIdentity> {
-  if (!claims.oid) throw new Error("Token missing oid claim");
+  if (!claims.oid) throw new AuthError(401, "missing_oid", "Token missing oid claim");
   const mode = await detectMode(graphToken, claims.oid);
   return mode === "edu"
     ? resolveFromEdu(claims, graphToken)
@@ -366,7 +421,28 @@ async function requireIdentity(
     next();
   } catch (err) {
     console.error("[bridge] identity resolution failed:", err);
-    res.status(500).json({ error: "identity resolution failed" });
+    if (err instanceof AuthError) {
+      res.status(err.status).json({ error: err.message, code: err.code });
+      return;
+    }
+    if (axios.isAxiosError(err)) {
+      const upstream = err.response?.status;
+      if (upstream && upstream >= 400 && upstream < 500) {
+        // Microsoft hat den OBO-/Graph-Call fuer DIESEN Nutzer abgelehnt (kein
+        // Admin-Consent, externer Gast, nicht provisioniert) — ein Autorisierungs-
+        // problem, kein Serverfehler.
+        res.status(403).json({
+          error: "Account is not authorized for this organization",
+          code: "not_provisioned",
+        });
+        return;
+      }
+      // Microsoft selbst nicht erreichbar / fehlerhaft — Gateway-Problem, nicht
+      // die Schuld des Nutzers.
+      res.status(502).json({ error: "Identity provider unavailable", code: "idp_unavailable" });
+      return;
+    }
+    res.status(500).json({ error: "identity resolution failed", code: "identity_error" });
   }
 }
 
