@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/TeamsAuthProvider";
+import { useAuth } from "../auth/authContext";
 import { UserProfile } from "../components/UserProfile";
 import {
   useBridgeApi,
@@ -44,7 +44,6 @@ export function HomePage() {
 
   const refresh = useCallback(async () => {
     if (!hasAnyRole) return;
-    setError(null);
     try {
       const wantsClasses = isAdmin || isTeacher || isStudent;
       const [c, t, v] = await Promise.all([
@@ -55,6 +54,7 @@ export function HomePage() {
       setClasses(c);
       setTemplates(t);
       setVms(v);
+      setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -62,18 +62,24 @@ export function HomePage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    refresh();
+    void (async () => {
+      await refresh();
+    })();
   }, [accessToken, refresh]);
 
   // Beim Wechsel der impersonierten Rolle: alte Daten sofort verwerfen,
   // damit die UI nicht 1-2 Sekunden lang stale Admin-Daten zeigt, bevor
-  // der refresh() durch ist. classes auf null setzen triggert das
-  // "Lade ..."-Empty-State.
-  useEffect(() => {
+  // der refresh() durch ist. classes auf null triggert den "Lade ..."-
+  // Empty-State. Wir erkennen den Wechsel beim Render (mit Vorwert-Guard)
+  // statt im Effect, um den Cascading-Render / setState-in-effect zu vermeiden.
+  const [lastImpersonatedRole, setLastImpersonatedRole] =
+    useState(impersonatedRole);
+  if (impersonatedRole !== lastImpersonatedRole) {
+    setLastImpersonatedRole(impersonatedRole);
     setClasses(null);
     setTemplates([]);
     setVms([]);
-  }, [impersonatedRole]);
+  }
 
   useEffect(() => {
     const anyRunning = vms.some((v) => v.status === "running");

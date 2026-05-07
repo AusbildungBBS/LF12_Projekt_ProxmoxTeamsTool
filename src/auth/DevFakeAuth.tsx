@@ -3,48 +3,9 @@ import {
   AuthContext,
   type GraphProfile,
   type BridgeIdentity,
-} from "./TeamsAuthProvider";
+} from "./authContext";
 import type { AccountInfo } from "@azure/msal-browser";
-
-// Dev-only auth bypass. Enabled via:
-//   - URL param `?devauth=admin|teacher|student` (one-time, stores in localStorage)
-//   - or localStorage.dev_auth_role = "admin" | "teacher" | "student"
-//   - or VITE_DEV_FAKE_AUTH env at build time
-// Tear down with `?devauth=off`.
-//
-// Exists because we can't reach the real Entra tenant right now and still want
-// to develop / preview the UI in all role states.
-
-const STORAGE_KEY = "dev_auth_role";
-const VALID_ROLES = ["admin", "teacher", "student"] as const;
-type DevRole = (typeof VALID_ROLES)[number];
-
-export function readDevAuthRole(): DevRole | null {
-  if (typeof window === "undefined") return null;
-
-  const params = new URLSearchParams(window.location.search);
-  const fromUrl = params.get("devauth");
-  if (fromUrl === "off") {
-    localStorage.removeItem(STORAGE_KEY);
-    return null;
-  }
-  if (fromUrl && (VALID_ROLES as readonly string[]).includes(fromUrl)) {
-    localStorage.setItem(STORAGE_KEY, fromUrl);
-    return fromUrl as DevRole;
-  }
-
-  const fromStorage = localStorage.getItem(STORAGE_KEY);
-  if (fromStorage && (VALID_ROLES as readonly string[]).includes(fromStorage)) {
-    return fromStorage as DevRole;
-  }
-
-  const fromEnv = import.meta.env.VITE_DEV_FAKE_AUTH as string | undefined;
-  if (fromEnv && (VALID_ROLES as readonly string[]).includes(fromEnv)) {
-    return fromEnv as DevRole;
-  }
-
-  return null;
-}
+import { STORAGE_KEY, VALID_ROLES, type DevRole } from "./devAuthRole";
 
 const ROLE_CLAIM_MAP: Record<DevRole, string> = {
   admin: "Proxmox.Admin",

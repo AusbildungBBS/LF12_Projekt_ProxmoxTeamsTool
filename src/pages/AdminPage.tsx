@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/TeamsAuthProvider";
+import { useAuth } from "../auth/authContext";
 import {
   useBridgeApi,
   type Template,
@@ -58,7 +58,9 @@ export function AdminPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    refresh();
+    void (async () => {
+      await refresh();
+    })();
   }, [accessToken, refresh]);
 
   useEffect(() => {

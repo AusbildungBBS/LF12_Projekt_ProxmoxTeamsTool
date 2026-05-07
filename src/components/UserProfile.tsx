@@ -1,4 +1,4 @@
-import { useAuth } from "../auth/TeamsAuthProvider";
+import { useAuth } from "../auth/authContext";
 
 export function UserProfile() {
   const {

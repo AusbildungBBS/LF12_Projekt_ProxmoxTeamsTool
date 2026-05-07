@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { useAuth } from "../auth/TeamsAuthProvider";
+import { useAuth } from "../auth/authContext";
 
 export type VmStatus = "running" | "stopped" | "paused" | "unknown";
 
@@ -124,5 +124,5 @@ export function useBridgeApi() {
           body: JSON.stringify(patch),
         }),
     };
-  }, [accessToken]);
+  }, [accessToken, impersonatedRole]);
 }

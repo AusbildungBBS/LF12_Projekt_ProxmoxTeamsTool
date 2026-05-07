@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import RFB from "@novnc/novnc";
 import Keyboard from "react-simple-keyboard";
 import "react-simple-keyboard/build/css/index.css";
-import { useAuth } from "../auth/TeamsAuthProvider";
+import { useAuth } from "../auth/authContext";
 import { useBridgeApi } from "../api/bridge";
 
 // Mapping von simple-keyboard-Buttons auf X11 Keysym + DOM event.code, das
@@ -165,7 +165,9 @@ export function ConsolePage() {
       if (rfbRef.current) {
         try {
           rfbRef.current.disconnect();
-        } catch {}
+        } catch {
+          // bereits getrennt oder nie verbunden — ignorieren
+        }
         rfbRef.current = null;
       }
     };

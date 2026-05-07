@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "../auth/TeamsAuthProvider";
+import { useAuth } from "../auth/authContext";
 import { useBridgeApi, type VmDTO } from "../api/bridge";
 
 function formatUptime(seconds: number): string {

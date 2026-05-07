@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { useAuth } from "../auth/TeamsAuthProvider";
+import { useAuth } from "../auth/authContext";
 import {
   useBridgeApi,
   type ClassInfo,
@@ -65,7 +65,9 @@ export function ClassesPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    refresh();
+    void (async () => {
+      await refresh();
+    })();
   }, [accessToken, refresh]);
 
   // Auto-Refresh fuer Live-Stats wenn was laeuft.
