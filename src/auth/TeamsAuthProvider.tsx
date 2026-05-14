@@ -31,6 +31,10 @@ function bridgeAuthErrorMessage(status: number, code?: string): string {
       return "Deine Sitzung ist abgelaufen. Bitte melde dich erneut an.";
     case "idp_unavailable":
       return "Microsoft ist gerade nicht erreichbar. Bitte versuch es in ein paar Minuten erneut.";
+    case "proxmox_unavailable":
+      return "Die Proxmox-Verbindung ist gerade nicht erreichbar. Bitte versuch es in ein paar Minuten erneut.";
+    case "upstream_unavailable":
+      return "Ein Backend-Dienst ist gerade nicht erreichbar. Bitte versuch es in ein paar Minuten erneut.";
   }
   if (status === 403)
     return "Zugriff verweigert — dein Konto ist für dieses Tool nicht berechtigt. Bitte kontaktiere einen Admin.";

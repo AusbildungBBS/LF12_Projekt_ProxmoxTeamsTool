@@ -389,6 +389,85 @@ async function resolveIdentity(
 
 // ── Identity Middleware + Authorization Helpers ────────────────────────────────
 
+// Klassifiziert einen Fehler aus dem Identity-/Upstream-Pfad nach Quelle
+// (Microsoft-IdP vs. Proxmox — resolveIdentity ruft fuer die Klassen-Whitelist
+// auch Proxmox auf!) und reicht die echte Ursache durch, statt pauschal den IdP
+// zu beschuldigen. Auth-Header/-URLs werden NICHT exponiert (nur Code/Message/
+// Upstream-Status/-Body); das rohe `detail` nur ausserhalb von production.
+function describeUpstreamError(err: unknown): {
+  status: number;
+  code: string;
+  error: string;
+  detail?: string;
+} {
+  if (err instanceof AuthError) {
+    return { status: err.status, code: err.code, error: err.message };
+  }
+  if (axios.isAxiosError(err)) {
+    const reqUrl = err.config?.baseURL ?? err.config?.url ?? "";
+    const proxmoxBase = PROXMOX_URL.replace(/\/+$/, "");
+    const target = /graph\.microsoft\.com|login\.microsoftonline\.com/.test(reqUrl)
+      ? "microsoft"
+      : proxmoxBase && reqUrl.startsWith(proxmoxBase)
+        ? "proxmox"
+        : "upstream";
+    const upstream = err.response?.status;
+    const body =
+      err.response?.data === undefined
+        ? ""
+        : typeof err.response.data === "string"
+          ? err.response.data
+          : JSON.stringify(err.response.data);
+    const rawDetail = [err.code, err.message, upstream ? `upstream ${upstream}` : "", body]
+      .filter(Boolean)
+      .join(" — ")
+      .slice(0, 400);
+    const detail = process.env.NODE_ENV === "production" ? undefined : rawDetail;
+
+    // 4xx mit Response = der Upstream hat bewusst abgelehnt.
+    if (upstream && upstream >= 400 && upstream < 500) {
+      if (target === "microsoft") {
+        return { status: 403, code: "not_provisioned", error: "Account is not authorized for this organization", detail };
+      }
+      if (target === "proxmox") {
+        return { status: 502, code: "proxmox_error", error: "Proxmox rejected the request", detail };
+      }
+      return { status: 502, code: "upstream_error", error: "Upstream rejected the request", detail };
+    }
+    // Kein Response (Timeout/ECONNREFUSED/DNS) oder 5xx = Upstream nicht erreichbar.
+    if (target === "proxmox") {
+      return { status: 504, code: "proxmox_unavailable", error: "Proxmox not reachable", detail };
+    }
+    if (target === "microsoft") {
+      return { status: 502, code: "idp_unavailable", error: "Identity provider unavailable", detail };
+    }
+    return { status: 502, code: "upstream_unavailable", error: "Upstream service unavailable", detail };
+  }
+  return {
+    status: 500,
+    code: "identity_error",
+    error: "identity resolution failed",
+    detail:
+      process.env.NODE_ENV === "production"
+        ? undefined
+        : err instanceof Error
+          ? err.message
+          : String(err),
+  };
+}
+
+// Schreibt einen klassifizierten Upstream-Fehler als JSON-Response.
+function sendUpstreamError(res: express.Response, err: unknown): void {
+  const d = describeUpstreamError(err);
+  res
+    .status(d.status)
+    .json(
+      d.detail
+        ? { error: d.error, code: d.code, detail: d.detail }
+        : { error: d.error, code: d.code }
+    );
+}
+
 async function requireIdentity(
   req: express.Request,
   res: express.Response,
@@ -405,28 +484,7 @@ async function requireIdentity(
     next();
   } catch (err) {
     console.error("[bridge] identity resolution failed:", err);
-    if (err instanceof AuthError) {
-      res.status(err.status).json({ error: err.message, code: err.code });
-      return;
-    }
-    if (axios.isAxiosError(err)) {
-      const upstream = err.response?.status;
-      if (upstream && upstream >= 400 && upstream < 500) {
-        // Microsoft hat den OBO-/Graph-Call fuer DIESEN Nutzer abgelehnt (kein
-        // Admin-Consent, externer Gast, nicht provisioniert) — ein Autorisierungs-
-        // problem, kein Serverfehler.
-        res.status(403).json({
-          error: "Account is not authorized for this organization",
-          code: "not_provisioned",
-        });
-        return;
-      }
-      // Microsoft selbst nicht erreichbar / fehlerhaft — Gateway-Problem, nicht
-      // die Schuld des Nutzers.
-      res.status(502).json({ error: "Identity provider unavailable", code: "idp_unavailable" });
-      return;
-    }
-    res.status(500).json({ error: "identity resolution failed", code: "identity_error" });
+    sendUpstreamError(res, err);
   }
 }
 
@@ -464,17 +522,7 @@ app.get("/api/me", requireAuth, async (req, res) => {
     });
   } catch (error: unknown) {
     console.error("/api/me failed:", error);
-    if (axios.isAxiosError(error)) {
-      res.status(error.response?.status || 500).json({
-        error: "Request failed",
-        details: error.response?.data,
-      });
-    } else {
-      res.status(500).json({
-        error: "Request failed",
-        message: error instanceof Error ? error.message : "Unknown error",
-      });
-    }
+    sendUpstreamError(res, error);
   }
 });
 
