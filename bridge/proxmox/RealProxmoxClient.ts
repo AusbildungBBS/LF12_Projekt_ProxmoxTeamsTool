@@ -5,7 +5,6 @@ import type {
   CloneOptions,
   Task,
   TaskRef,
-  TaskStatus,
   VM,
   VMConfig,
   VMID,

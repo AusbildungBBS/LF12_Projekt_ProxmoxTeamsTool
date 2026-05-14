@@ -13,7 +13,6 @@ import type { VM, VMID } from "./proxmox";
 import { filterToActiveClasses, clearActiveClassCache } from "./classes";
 import { TAG, tagValue, tagValues, hasTag } from "./tags";
 import {
-  type AppRole,
   type BridgeIdentity,
   isAdmin,
   isTeacher,
