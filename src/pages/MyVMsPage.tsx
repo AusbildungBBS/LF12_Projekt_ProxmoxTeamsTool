@@ -62,7 +62,9 @@ export function MyVMsPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    refresh();
+    void (async () => {
+      await refresh();
+    })();
   }, [accessToken, refresh]);
 
   // Auto-Refresh fuer Live-Stats: wenn mindestens eine VM laeuft, alle 5 s.

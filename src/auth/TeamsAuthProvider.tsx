@@ -80,6 +80,34 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const classes = identity?.classes ?? [];
   const hasRole = (role: string) => roles.includes(role);
 
+  // Teams SSO: holt still ein Token vom Teams-Client. Vor dem ersten useEffect
+  // deklariert, da dieser sie aufruft (react-hooks/immutability).
+  const teamsSSO = async () => {
+    try {
+      const token = await authentication.getAuthToken();
+      setAccessToken(token);
+
+      // Optionally exchange token on backend for Graph access
+      // via the On-Behalf-Of flow
+      return token;
+    } catch (err) {
+      console.warn("Teams SSO failed, falling back to MSAL popup:", err);
+      setError("Teams SSO failed – try manual login");
+      return null;
+    }
+  };
+
+  // Beim Wegfall des Tokens (Logout/Expiry) Profil + Identity verwerfen — beim
+  // Render erkannt (Vorwert-Guard) statt im Effect (react-hooks/set-state-in-effect).
+  const [hadAccessToken, setHadAccessToken] = useState(!!accessToken);
+  if (!!accessToken !== hadAccessToken) {
+    setHadAccessToken(!!accessToken);
+    if (!accessToken) {
+      setProfile(null);
+      setIdentity(null);
+    }
+  }
+
   // Detect if running inside Teams
   useEffect(() => {
     const initTeams = async () => {
@@ -129,11 +157,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   // Re-fetcht bei Impersonation-Switch, damit die Server-seitig gerechnete
   // Identity (Klassen-Filter etc.) zur impersonierten Rolle passt.
   useEffect(() => {
-    if (!accessToken) {
-      setProfile(null);
-      setIdentity(null);
-      return;
-    }
+    if (!accessToken) return;
     let cancelled = false;
     (async () => {
       try {
@@ -180,24 +204,6 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [accessToken, impersonatedRole]);
-
-  /**
-   * Teams SSO: get a token silently from Teams client.
-   */
-  const teamsSSO = async () => {
-    try {
-      const token = await authentication.getAuthToken();
-      setAccessToken(token);
-
-      // Optionally exchange token on backend for Graph access
-      // via the On-Behalf-Of flow
-      return token;
-    } catch (err) {
-      console.warn("Teams SSO failed, falling back to MSAL popup:", err);
-      setError("Teams SSO failed – try manual login");
-      return null;
-    }
-  };
 
   /**
    * Login via MSAL redirect (robust in popups, iframes, and webviews).

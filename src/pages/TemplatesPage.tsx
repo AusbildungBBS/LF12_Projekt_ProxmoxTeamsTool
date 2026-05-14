@@ -33,7 +33,9 @@ export function TemplatesPage() {
 
   useEffect(() => {
     if (!accessToken) return;
-    refresh();
+    void (async () => {
+      await refresh();
+    })();
     if (canManage) {
       api.listAssignableClasses().then(setAssignable).catch(() => setAssignable([]));
     }
