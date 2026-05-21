@@ -23,9 +23,7 @@ export function UserProfile() {
   if (!isAuthenticated) {
     return (
       <div className="welcome">
-        <div className="welcome-mark" aria-hidden>
-          P
-        </div>
+        <img src="/logo.svg" alt="Proxmox Teams Tool" className="welcome-mark" />
         <h2>Willkommen beim Proxmox Teams Tool</h2>
         <p>
           Melde dich mit deinem Microsoft-Account an, um auf deine VMs und

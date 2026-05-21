@@ -11,7 +11,7 @@ export function Layout() {
       <header className="app-header">
         <div className="app-header-inner">
           <div className="app-brand">
-            <div className="app-brand-mark" aria-hidden>P</div>
+            <img src="/logo.svg" alt="" aria-hidden className="app-brand-mark" />
             <h1 className="app-title">
               Proxmox <span className="app-title-accent">Teams Tool</span>
             </h1>
