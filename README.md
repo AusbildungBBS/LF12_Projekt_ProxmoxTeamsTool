@@ -60,15 +60,18 @@ Der Bypass greift **ausschließlich** wenn explizit aktiviert. Im Auslieferungsz
 
 ---
 
-## Docker (Bridge produktiv)
+## Docker (Bridge + Frontend)
 
-Die Bridge ist containerisiert (Multi-Stage Node-Build, läuft als `node`-User):
+Beide Tiers sind containerisiert. Komplettes Setup starten:
 
 ```bash
-docker compose up --build bridge
+docker compose up --build
 ```
 
-In Produktion läuft die Bridge im Proxmox-Netz. Zwei Wege, sie erreichbar zu machen sind in [docker-compose.yml](docker-compose.yml) als Kommentar dokumentiert:
+- **Bridge** ([bridge/Dockerfile](bridge/Dockerfile), Multi-Stage Node-Build, läuft als `node`-User) auf Port **3001**.
+- **Frontend** ([Dockerfile.frontend](Dockerfile.frontend), Vite-Build → nginx) auf Port **8080**. Vite bäckt `VITE_*` zur Build-Zeit ein — deshalb schreibt ein Entrypoint beim Container-Start eine `/config.js` aus den Compose-Env-Vars/Secrets (`window.__APP_CONFIG__`, Fallback auf `VITE_*`). So ist **ein Image für alle Umgebungen** zur Laufzeit konfigurierbar, ohne Rebuild.
+
+In Produktion läuft die Bridge im Proxmox-Netz. Zwei Wege, sie erreichbar zu machen, sind in [docker-compose.yml](docker-compose.yml) als Kommentar dokumentiert:
 
 1. **Klassisches Port-Mapping** (Default) — Bridge wird auf Host-Port 3001 exponiert, davor ein Reverse-Proxy mit TLS.
 2. **Cloudflare Tunnel** (auskommentiert) — `cloudflared` als Sidecar-Container; keine eingehenden Ports auf dem Host nötig, der Tunnel öffnet nur eine ausgehende Verbindung. Empfohlen, wenn man die Firewall im Schul-Netz nicht aufmachen will.
@@ -89,6 +92,8 @@ Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-Variablen tragen
 | `PROXMOX_URL` / `PROXMOX_TOKEN_ID` / `PROXMOX_TOKEN_SECRET` | Proxmox-Anbindung. Wenn gesetzt: Bridge filtert die `classes`-Liste der Identity gegen die `tpl-class-<oid>`-Tags. Wenn leer: Filter aus (alle Group-Memberships passieren). |
 | `PROXMOX_TLS_REJECT_UNAUTHORIZED` | `false` für Self-Signed-Cert (Dev). Default `true`. |
 | `CF_TUNNEL_TOKEN` | Optional, wenn Cloudflare-Tunnel-Service in Compose aktiviert wird |
+
+> **Env-Vars oder Secrets.** Jede Variable kann alternativ als `<NAME>_FILE` (Dateipfad, z.B. Docker-/Compose-Secret unter `/run/secrets/...`) gesetzt werden — gilt für Bridge **und** Frontend-Container. Die direkte Env-Var hat Vorrang. Beispiel-`secrets:`-Block (auskommentiert) in [docker-compose.yml](docker-compose.yml).
 
 ---
 

@@ -25,14 +25,17 @@ import {
   applyImpersonation,
 } from "./authz";
 import { buildVmName } from "./naming";
+import { envOrFile } from "./env";
 
 dotenv.config();
 
 const PORT = process.env.PORT || 3001;
-const TENANT_ID = process.env.AZURE_TENANT_ID || process.env.VITE_AZURE_TENANT_ID;
-const CLIENT_ID = process.env.AZURE_CLIENT_ID || process.env.VITE_AZURE_CLIENT_ID;
-const CLIENT_SECRET = process.env.AZURE_CLIENT_SECRET;
-const API_AUDIENCE = process.env.API_AUDIENCE;
+// Config-Werte via envOrFile(): Env-Var <NAME> ODER Datei aus <NAME>_FILE
+// (Docker-/Compose-Secrets). Beide Wege werden unterstuetzt.
+const TENANT_ID = envOrFile("AZURE_TENANT_ID") || envOrFile("VITE_AZURE_TENANT_ID");
+const CLIENT_ID = envOrFile("AZURE_CLIENT_ID") || envOrFile("VITE_AZURE_CLIENT_ID");
+const CLIENT_SECRET = envOrFile("AZURE_CLIENT_SECRET");
+const API_AUDIENCE = envOrFile("API_AUDIENCE");
 
 // AUTH_MODE: standard | edu | auto (default). Controls how the bridge derives
 // roles + classes for a user. See docs/entra-setup.md → "Tenant-Typ wählen".
@@ -42,9 +45,9 @@ const AUTH_MODE = (process.env.AUTH_MODE ?? "auto").toLowerCase() as
   | "auto";
 
 // Proxmox-Connection-Konstanten (oben, weil mehrere Helfer sie referenzieren).
-const PROXMOX_URL = process.env.PROXMOX_URL ?? "";
-const PROXMOX_TOKEN_ID = process.env.PROXMOX_TOKEN_ID ?? "";
-const PROXMOX_TOKEN_SECRET = process.env.PROXMOX_TOKEN_SECRET ?? "";
+const PROXMOX_URL = envOrFile("PROXMOX_URL") ?? "";
+const PROXMOX_TOKEN_ID = envOrFile("PROXMOX_TOKEN_ID") ?? "";
+const PROXMOX_TOKEN_SECRET = envOrFile("PROXMOX_TOKEN_SECRET") ?? "";
 const PROXMOX_TLS_INSECURE =
   (process.env.PROXMOX_TLS_REJECT_UNAUTHORIZED ?? "true").toLowerCase() ===
   "false";
@@ -52,7 +55,7 @@ const PROXMOX_TLS_INSECURE =
 // Proxmox client (null if env not configured — bridge then skips class filter).
 const proxmox = createProxmoxClientFromEnv();
 if (proxmox) {
-  console.log("[bridge] Proxmox client configured: " + process.env.PROXMOX_URL);
+  console.log("[bridge] Proxmox client configured: " + PROXMOX_URL);
 } else {
   console.log("[bridge] Proxmox not configured -- class allowlist disabled, all M365 groups pass through");
 }
@@ -906,7 +909,7 @@ app.get("/api/vms/:vmid/console-link", requireAuth, requireIdentity, async (req,
       res.status(403).json({ error: "Not allowed" });
       return;
     }
-    const base = (process.env.PROXMOX_URL ?? "").replace(/\/+$/, "");
+    const base = PROXMOX_URL.replace(/\/+$/, "");
     const url = `${base}/?console=kvm&novnc=1&vmid=${vm.vmid}&node=${vm.node}&resize=scale`;
     res.json({
       url,
@@ -1143,7 +1146,7 @@ if (process.env.NODE_ENV !== "production") {
         }
       }
       res.json({
-        url: process.env.PROXMOX_URL,
+        url: PROXMOX_URL,
         nodes,
         vms,
         activeClassOids: [...activeClassOids],

@@ -16,3 +16,7 @@ Dockerfile
 .dockerignore
 README.md
 KONZEPT.md
+appPackage
+docs
+secrets
+**/*.test.ts
