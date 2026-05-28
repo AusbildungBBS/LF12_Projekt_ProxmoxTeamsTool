@@ -124,6 +124,22 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         const context = await app.getContext();
         if (context) {
           setIsInTeams(true);
+          // Name/E-Mail aus dem Teams-Kontext als Fallback setzen, damit die
+          // Profilleiste sie auch OHNE Bridge zeigt — in Teams gibt es kein
+          // MSAL-Konto (user ist null), und das echte Graph-Profil kommt sonst
+          // erst von /api/me. Sobald die Bridge antwortet, ueberschreibt deren
+          // Profil diesen Fallback (setProfile in der /api/me-Effect-Logik).
+          const tu = context.user;
+          if (tu) {
+            setProfile((prev) =>
+              prev ?? {
+                id: tu.id ?? "",
+                displayName: tu.displayName ?? tu.userPrincipalName ?? "",
+                mail: tu.userPrincipalName ?? null,
+                userPrincipalName: tu.userPrincipalName ?? "",
+              }
+            );
+          }
           // Try Teams SSO
           await teamsSSO();
         }
