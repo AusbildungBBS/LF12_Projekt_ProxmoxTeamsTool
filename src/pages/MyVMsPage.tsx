@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { useRoleFlags } from "../auth/useRoleFlags";
 import { useBridgeApi, type VmDTO } from "../api/bridge";
+import { useConfirm } from "../components/ConfirmDialog";
 import { StatusBadge } from "../components/StatusBadge";
 import { ErrorCard } from "../components/ErrorCard";
 import { LoadingCard } from "../components/LoadingCard";
@@ -54,6 +55,7 @@ export function MyVMsPage() {
   const { isStudent } = useRoleFlags();
   const api = useBridgeApi();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const [vms, setVms] = useState<VmDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,8 +121,26 @@ export function MyVMsPage() {
     vm: VmDTO,
     action: "start" | "shutdown" | "stop" | "delete"
   ) {
-    if (action === "delete" && !confirm(`VM "${vm.name}" wirklich löschen?`)) return;
-    if (action === "stop" && !confirm(`VM "${vm.name}" hart stoppen (Strom trennen)?`)) return;
+    if (
+      action === "delete" &&
+      !(await confirm({
+        title: "VM löschen",
+        message: `VM "${vm.name}" wirklich löschen? Das kann nicht rückgängig gemacht werden.`,
+        confirmLabel: "Löschen",
+        danger: true,
+      }))
+    )
+      return;
+    if (
+      action === "stop" &&
+      !(await confirm({
+        title: "Hart stoppen",
+        message: `VM "${vm.name}" hart stoppen (Strom trennen)? Nicht gespeicherte Daten gehen verloren.`,
+        confirmLabel: "Hart stoppen",
+        danger: true,
+      }))
+    )
+      return;
     setBusyId(vm.vmid);
     setError(null);
     try {

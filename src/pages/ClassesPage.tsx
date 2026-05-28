@@ -8,6 +8,7 @@ import {
   type Template,
   type VmDTO,
 } from "../api/bridge";
+import { useConfirm } from "../components/ConfirmDialog";
 import { VmStatsPill } from "../components/VmStatsPill";
 import { StatusBadge } from "../components/StatusBadge";
 import { ErrorCard } from "../components/ErrorCard";
@@ -37,6 +38,7 @@ export function ClassesPage() {
   const { isAuthenticated, accessToken } = useAuth();
   const { isStaff } = useRoleFlags();
   const api = useBridgeApi();
+  const confirm = useConfirm();
 
   const [classes, setClasses] = useState<ClassInfo[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);
@@ -98,12 +100,22 @@ export function ClassesPage() {
     }
     if (
       action === "delete" &&
-      !confirm(`${targetVms.length} VM(s) in dieser Klasse wirklich löschen?`)
+      !(await confirm({
+        title: "VMs löschen",
+        message: `${targetVms.length} VM(s) in dieser Klasse wirklich löschen? Das kann nicht rückgängig gemacht werden.`,
+        confirmLabel: "Löschen",
+        danger: true,
+      }))
     )
       return;
     if (
       action === "stop" &&
-      !confirm(`${targetVms.length} VM(s) hart stoppen?`)
+      !(await confirm({
+        title: "Hart stoppen",
+        message: `${targetVms.length} VM(s) hart stoppen? Nicht gespeicherte Daten gehen verloren.`,
+        confirmLabel: "Hart stoppen",
+        danger: true,
+      }))
     )
       return;
 

@@ -7,6 +7,7 @@ import {
   type ClassInfo,
   type Template,
 } from "../api/bridge";
+import { useConfirm } from "../components/ConfirmDialog";
 import { ErrorCard } from "../components/ErrorCard";
 import { LoadingCard } from "../components/LoadingCard";
 import { EmptyCard } from "../components/EmptyCard";
@@ -18,6 +19,7 @@ export function TemplatesPage() {
   const { isStudent, isAdmin, isStaff: canManage } = useRoleFlags();
   const api = useBridgeApi();
   const navigate = useNavigate();
+  const confirm = useConfirm();
 
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [assignable, setAssignable] = useState<ClassInfo[] | null>(null);
@@ -82,7 +84,14 @@ export function TemplatesPage() {
   }
 
   async function release(t: Template) {
-    if (!confirm(`Vorlage "${t.name}" freigeben? Sie kann danach wieder übernommen werden.`)) return;
+    if (
+      !(await confirm({
+        title: "Vorlage freigeben",
+        message: `Vorlage "${t.name}" freigeben? Sie kann danach wieder übernommen werden.`,
+        confirmLabel: "Freigeben",
+      }))
+    )
+      return;
     await withBusy(t.vmid, async () => {
       await api.releaseTemplate(t.vmid);
       await refresh();

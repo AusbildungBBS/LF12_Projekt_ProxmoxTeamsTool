@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { TeamsAuthProvider } from "./auth/TeamsAuthProvider";
+import { ConfirmProvider } from "./components/ConfirmDialog";
 import { Layout } from "./components/Layout";
 import { HomePage } from "./pages/HomePage";
 import { MyVMsPage } from "./pages/MyVMsPage";
@@ -15,21 +16,23 @@ import "./App.css";
 function App() {
   return (
     <TeamsAuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<Layout />}>
-            <Route index element={<HomePage />} />
-            <Route path="my-vms" element={<MyVMsPage />} />
-            <Route path="vms/:vmid/console" element={<ConsolePage />} />
-            <Route path="templates" element={<TemplatesPage />} />
-            <Route path="classes" element={<ClassesPage />} />
-            <Route path="admin" element={<AdminPage />} />
-            <Route path="privacy" element={<PrivacyPage />} />
-            <Route path="terms" element={<TermsPage />} />
-            <Route path="*" element={<NotFoundPage />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <ConfirmProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route element={<Layout />}>
+              <Route index element={<HomePage />} />
+              <Route path="my-vms" element={<MyVMsPage />} />
+              <Route path="vms/:vmid/console" element={<ConsolePage />} />
+              <Route path="templates" element={<TemplatesPage />} />
+              <Route path="classes" element={<ClassesPage />} />
+              <Route path="admin" element={<AdminPage />} />
+              <Route path="privacy" element={<PrivacyPage />} />
+              <Route path="terms" element={<TermsPage />} />
+              <Route path="*" element={<NotFoundPage />} />
+            </Route>
+          </Routes>
+        </BrowserRouter>
+      </ConfirmProvider>
     </TeamsAuthProvider>
   );
 }
