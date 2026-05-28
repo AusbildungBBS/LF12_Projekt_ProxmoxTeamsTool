@@ -71,6 +71,16 @@ docker compose up --build
 - **Bridge** ([bridge/Dockerfile](bridge/Dockerfile), Multi-Stage Node-Build, läuft als `node`-User) auf Port **3001**.
 - **Frontend** ([Dockerfile.frontend](Dockerfile.frontend), Vite-Build → nginx) auf Port **8080**. Vite bäckt `VITE_*` zur Build-Zeit ein — deshalb schreibt ein Entrypoint beim Container-Start eine `/config.js` aus den Compose-Env-Vars/Secrets (`window.__APP_CONFIG__`, Fallback auf `VITE_*`). So ist **ein Image für alle Umgebungen** zur Laufzeit konfigurierbar, ohne Rebuild.
 
+Das Frontend ruft die Bridge bewusst über relative Pfade auf (`/api/...` und `/ws/...`). In der lokalen Entwicklung leitet Vite diese Pfade per Dev-Proxy an `localhost:3001` weiter. Im Docker-/Produktivbetrieb braucht es dafür einen gemeinsamen öffentlichen Host bzw. vorgeschalteten Reverse-Proxy:
+
+| Pfad | Ziel |
+|---|---|
+| `/` | Frontend/nginx (`frontend:80`) |
+| `/api/*` | Bridge (`bridge:3001`) |
+| `/ws/*` | Bridge-WebSocket (`bridge:3001`) |
+
+Nur das Frontend auf Port 8080 zu öffnen reicht für API-Aufrufe nicht aus, weil der nginx-Container selbst kein `/api`-Proxy ist. Für Teams sollte die App deshalb unter einer einzigen HTTPS-Origin laufen, z.B. `https://pttool.example.org/`, mit `/api` und `/ws` auf die Bridge geroutet.
+
 In Produktion läuft die Bridge im Proxmox-Netz. Zwei Wege, sie erreichbar zu machen, sind in [docker-compose.yml](docker-compose.yml) als Kommentar dokumentiert:
 
 1. **Klassisches Port-Mapping** (Default) — Bridge wird auf Host-Port 3001 exponiert, davor ein Reverse-Proxy mit TLS.
