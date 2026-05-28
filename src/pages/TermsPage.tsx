@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-// Platzhalter-Seite fuer die im Teams-Manifest referenzierte termsOfUseUrl
+// Platzhalter-Seite für die im Teams-Manifest referenzierte termsOfUseUrl
 // (/terms). Kein rechtsverbindliches Dokument.
 export function TermsPage() {
   return (

@@ -53,9 +53,9 @@ export function HomePage() {
   }, [accessToken, refresh]);
 
   // Beim Wechsel der impersonierten Rolle: alte Daten sofort verwerfen,
-  // damit die UI nicht 1-2 Sekunden lang stale Admin-Daten zeigt, bevor
+  // damit die UI nicht 1-2 Sekunden lang veraltete Admin-Daten zeigt, bevor
   // der refresh() durch ist. classes auf null triggert den "Lade ..."-
-  // Empty-State. Wir erkennen den Wechsel beim Render (mit Vorwert-Guard)
+  // Leerzustand. Wir erkennen den Wechsel beim Render (mit Vorwert-Guard)
   // statt im Effect, um den Cascading-Render / setState-in-effect zu vermeiden.
   const [lastImpersonatedRole, setLastImpersonatedRole] =
     useState(impersonatedRole);
@@ -90,12 +90,12 @@ export function HomePage() {
 
       <ErrorCard message={error} />
 
-      {/* Admin: 3-Spalten-Overview wie /admin */}
+      {/* Admin: 3-Spalten-Übersicht wie /admin */}
       {isAdmin && (
         <div className="admin-grid">
           <div className="card">
             <h3>
-              Templates ({templates.length}){" "}
+              Vorlagen ({templates.length}){" "}
               <Link to="/templates" className="card-section-link">
                 verwalten →
               </Link>
@@ -108,11 +108,11 @@ export function HomePage() {
                   </Link>{" "}
                   <span className="muted">(VMID {t.vmid})</span>
                   {t.isPublic && (
-                    <span className="badge badge-public">public</span>
+                    <span className="badge badge-public">öffentlich</span>
                   )}
                   <br />
                   <small className="muted">
-                    {t.classes.length} Klasse(n) · Owner{" "}
+                    {t.classes.length} Klasse(n) · Besitzer{" "}
                     {shortOid(t.ownerOid)}
                   </small>
                 </li>
@@ -137,7 +137,7 @@ export function HomePage() {
                   {v.status === "running" && (
                     <Link
                       to={`/vms/${v.vmid}/console`}
-                      title="Console"
+                      title="Konsole"
                       className="inline-icon-link"
                     >
                       🖥
@@ -170,7 +170,7 @@ export function HomePage() {
         </div>
       )}
 
-      {/* Lehrer: Klassen + eigene Templates */}
+      {/* Lehrer: Klassen + eigene Vorlagen */}
       {isTeacher && !isAdmin && (
         <>
           <Link to="/classes" className="card card-link">
@@ -182,19 +182,19 @@ export function HomePage() {
                 ))}
               </ul>
             ) : (
-              <p>Noch keine aktiven Klassen — weise einem deiner Templates eine Klasse zu.</p>
+              <p>Noch keine aktiven Klassen — weise einer deiner Vorlagen eine Klasse zu.</p>
             )}
           </Link>
 
           <Link to="/templates" className="card card-link">
-            <h3>Deine Templates ({ownedTemplates.length})</h3>
+            <h3>Deine Vorlagen ({ownedTemplates.length})</h3>
             {ownedTemplates.length > 0 ? (
               <ul className="home-inline">
                 {ownedTemplates.map((t) => (
                   <li key={t.vmid}>
                     {t.name}
                     {t.isPublic && (
-                      <span className="badge badge-public">public</span>
+                      <span className="badge badge-public">öffentlich</span>
                     )}{" "}
                     <span className="muted">· {t.classes.length} Klasse(n)</span>
                   </li>
@@ -202,16 +202,16 @@ export function HomePage() {
               </ul>
             ) : (
               <p>
-                Du hast noch keine Templates uebernommen. In der Templates-Seite
-                kannst du ungeclaimte Templates per <strong>Mir zuweisen</strong>{" "}
-                claimen.
+                Du hast noch keine Vorlagen übernommen. In der Vorlagen-Seite
+                kannst du noch nicht zugewiesene Vorlagen per{" "}
+                <strong>Mir zuweisen</strong> übernehmen.
               </p>
             )}
           </Link>
         </>
       )}
 
-      {/* Schueler: Klassen + verfuegbare Templates + eigene VMs */}
+      {/* Schüler: Klassen + verfügbare Vorlagen + eigene VMs */}
       {isStudent && !isAdmin && !isTeacher && (
         <>
           <Link to="/classes" className="card card-link">
@@ -223,12 +223,12 @@ export function HomePage() {
                 ))}
               </ul>
             ) : (
-              <p>Du bist (noch) in keiner aktiven Klasse fuer dieses Tool.</p>
+              <p>Du bist (noch) in keiner aktiven Klasse für dieses Tool.</p>
             )}
           </Link>
 
           <Link to="/templates" className="card card-link">
-            <h3>Verfuegbare Templates ({templates.length})</h3>
+            <h3>Verfügbare Vorlagen ({templates.length})</h3>
             {templates.length > 0 ? (
               <ul className="home-inline">
                 {templates.map((t) => (
@@ -239,8 +239,8 @@ export function HomePage() {
               </ul>
             ) : (
               <p>
-                Aktuell keine Templates fuer deine Klasse(n) — sobald ein
-                Lehrer eines freigibt, taucht es hier auf.
+                Aktuell keine Vorlagen für deine Klasse(n) — sobald ein
+                Lehrer eine freigibt, taucht sie hier auf.
               </p>
             )}
           </Link>
@@ -259,8 +259,8 @@ export function HomePage() {
               </ul>
             ) : (
               <p>
-                Noch keine eigenen VMs. Klick auf der Templates-Seite auf{" "}
-                <strong>+</strong>, um eine VM aus einem Template zu erstellen.
+                Noch keine eigenen VMs. Klick auf der Vorlagen-Seite auf{" "}
+                <strong>+</strong>, um eine VM aus einer Vorlage zu erstellen.
               </p>
             )}
           </Link>

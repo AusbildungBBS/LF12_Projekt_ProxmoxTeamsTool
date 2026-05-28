@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 // Liest einen Config-Wert aus der Environment-Variable <name> ODER, falls
 // <name>_FILE gesetzt ist, aus der referenzierten Datei (Docker-/Compose-
 // Secrets werden als Dateien unter /run/secrets/<name> gemountet). So
-// funktionieren Environment-Variablen UND Secrets gleichermassen — die
+// funktionieren Environment-Variablen UND Secrets gleichermaßen — die
 // direkte Env-Var hat Vorrang, sonst greift die Datei.
 export function envOrFile(name: string): string | undefined {
   const direct = process.env[name];

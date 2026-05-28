@@ -10,7 +10,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { errMsg } from "../lib/errors";
 
 // Mapping von simple-keyboard-Buttons auf X11 Keysym + DOM event.code, das
-// noVNC bzw. Proxmox-VNC fuer den Tastenanschlag erwartet.
+// noVNC bzw. Proxmox-VNC für den Tastenanschlag erwartet.
 // Druckbare ASCII-Chars werden direkt aus charCode abgeleitet, nur die
 // Sondertasten brauchen diese Tabelle.
 const SK_KEYMAP: Record<string, { keysym: number; code: string }> = {
@@ -100,11 +100,11 @@ export function ConsolePage() {
   const { vmid } = useParams<{ vmid: string }>();
   const { accessToken } = useAuth();
   const api = useBridgeApi();
-  // api/Token aendern sich bei jedem Hintergrund-Refresh (~45 min). Wir halten
+  // api/Token ändern sich bei jedem Hintergrund-Refresh (~45 min). Wir halten
   // die api in einer Ref, damit der VNC-Effect NICHT bei jedem Refresh die
-  // laufende Session abreisst — sie haengt nach dem ersten Call ohnehin am
+  // laufende Session abreißt — sie hängt nach dem ersten Call ohnehin am
   // sessionKey, nicht mehr am Access-Token. Verbunden wird daher nur auf vmid /
-  // "Token ueberhaupt vorhanden" / manuellen Reconnect.
+  // "Token überhaupt vorhanden" / manuellen Neuaufbau.
   const apiRef = useRef(api);
   useEffect(() => {
     apiRef.current = api;
@@ -122,7 +122,7 @@ export function ConsolePage() {
   const [kbLayoutName, setKbLayoutName] = useState<"default" | "shift">("default");
   const [connectNonce, setConnectNonce] = useState(0);
 
-  // Manueller Reconnect: baut die VNC-Session neu auf. vncSession() erneuert
+  // Manueller Neuaufbau: baut die VNC-Sitzung neu auf. vncSession() erneuert
   // dabei via 401-Retry bei abgelaufenem Token transparent das Access-Token.
   const reconnect = useCallback(() => {
     setStatus("connecting");
@@ -143,7 +143,7 @@ export function ConsolePage() {
         if (cancelled || !canvasRef.current) return;
 
         // wsUrl() leitet die ws(s)://-URL aus der konfigurierten Bridge-Origin
-        // ab (API_BASE_URL) bzw. faellt auf die aktuelle Seiten-Origin zurueck.
+        // ab (API_BASE_URL) bzw. fällt auf die aktuelle Seiten-Origin zurück.
         const socketUrl = wsUrl(
           `/ws/vnc/${numVmid}?session=${encodeURIComponent(sessionKey)}`
         );
@@ -159,11 +159,11 @@ export function ConsolePage() {
         rfb.background = "#000";
         rfb.viewOnly = false;
         // focusOnClick ist Default true -- erstklick gibt Canvas Tastatur-Fokus.
-        // Erste Tastenanschlaege also nach einem Klick ins Bild.
+        // Erste Tastenanschläge also nach einem Klick ins Bild.
 
         rfb.addEventListener("connect", () => {
           setStatus("connected");
-          // Sofort Fokus, damit keine Klicks zum tippen noetig sind.
+          // Sofort Fokus, damit keine Klicks zum tippen nötig sind.
           rfb?.focus();
         });
         rfb.addEventListener("disconnect", (ev: Event) => {
@@ -174,7 +174,7 @@ export function ConsolePage() {
         rfb.addEventListener("securityfailure", (ev: Event) => {
           setStatus("error");
           const d = (ev as CustomEvent<{ reason?: string }>).detail;
-          setDetail(d?.reason ?? "security failure");
+          setDetail(d?.reason ?? "Sicherheitsfehler");
         });
         rfbRef.current = rfb;
       } catch (e) {
@@ -198,8 +198,8 @@ export function ConsolePage() {
     };
   }, [vmid, hasToken, connectNonce]);
 
-  // Browser-Fullscreen-Events spiegeln in den State, damit Layout + Button
-  // konsistent sind, egal wer den Fullscreen verlaesst (ESC, F11, Button).
+  // Browser-Vollbild-Events spiegeln in den State, damit Layout + Button
+  // konsistent sind, egal wer das Vollbild verlässt (ESC, F11, Button).
   useEffect(() => {
     const handler = () => setFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handler);
@@ -218,7 +218,7 @@ export function ConsolePage() {
         await document.exitFullscreen();
       }
     } catch (e) {
-      console.error("fullscreen toggle failed:", e);
+      console.error("Vollbild-Umschaltung fehlgeschlagen:", e);
     }
   }, []);
 
@@ -254,10 +254,10 @@ export function ConsolePage() {
     <section className={`page console-page ${fullscreen ? "fullscreen" : ""}`}>
       {!fullscreen && (
         <header className="page-header">
-          <h2>VM-Console (VMID {vmid})</h2>
+          <h2>VM-Konsole (VMID {vmid})</h2>
           <p className="page-subtitle">
-            Klick ins Bild fuer Tastatur-Fokus. Vollbild gibt mehr Platz und
-            bessere Maus-Capture.
+            Klick ins Bild für Tastatur-Fokus. Vollbild gibt mehr Platz und
+            bessere Maus-Erfassung.
           </p>
         </header>
       )}
@@ -273,7 +273,7 @@ export function ConsolePage() {
             <button
               className="icon-button wide"
               aria-label="Neu verbinden"
-              title="VNC-Session neu aufbauen"
+              title="VNC-Sitzung neu aufbauen"
               data-tooltip="Neu verbinden"
               onClick={reconnect}
             >
@@ -314,9 +314,9 @@ export function ConsolePage() {
             <Link to="/my-vms">
               <button
                 className="icon-button"
-                aria-label="Zurueck"
-                title="Zurueck zur VM-Liste"
-                data-tooltip="Zurueck zur VM-Liste"
+                aria-label="Zurück"
+                title="Zurück zur VM-Liste"
+                data-tooltip="Zurück zur VM-Liste"
               >
                 ←
               </button>
@@ -350,7 +350,7 @@ export function ConsolePage() {
             </button>
           </p>
           <p>
-            Pruefe im Bridge-Log nach <code>[bridge] upstream vnc</code> oder
+            Prüfe im Bridge-Log nach <code>[bridge] upstream vnc</code> oder
             <code> [bridge] /ws/vnc</code>.
           </p>
         </div>

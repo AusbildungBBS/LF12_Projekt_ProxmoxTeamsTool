@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# Baut ein sideload-faehiges Teams-App-Paket aus manifest.json + Icons.
+# Baut ein sideload-fähiges Teams-App-Paket aus manifest.json + Icons.
 #
 # Pflicht-Env (oder via .env aus dem Repo-Root):
-#   FRONTEND_HOST       Public Host:Port ohne https://, z.B. macbook.tail-xxxx.ts.net
+#   FRONTEND_HOST       Öffentlicher Host:Port ohne https://, z.B. macbook.tail-xxxx.ts.net
 #   AZURE_CLIENT_ID     Entra-Client-ID (steht in .env)
 # Optional:
-#   AZURE_APP_ID_URI    Default: api://$FRONTEND_HOST/$AZURE_CLIENT_ID
+#   AZURE_APP_ID_URI    Standard: api://$FRONTEND_HOST/$AZURE_CLIENT_ID
 #
 # Ausgabe: pttool-teams-app.zip im appPackage-Ordner
 #
@@ -16,7 +16,7 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
 # Repo-.env durchladen falls vorhanden. Explizit gesetzte Env-Werte gewinnen
-# gegen die .env, damit lokale Demo-Builds leicht ueberschreibbar bleiben.
+# gegen die .env, damit lokale Demo-Builds leicht überschreibbar bleiben.
 FRONTEND_HOST_ENV="${FRONTEND_HOST:-}"
 AZURE_CLIENT_ID_ENV="${AZURE_CLIENT_ID:-}"
 AZURE_APP_ID_URI_ENV="${AZURE_APP_ID_URI:-}"
@@ -39,7 +39,7 @@ AZURE_APP_ID_URI="${AZURE_APP_ID_URI:-api://$FRONTEND_HOST/$AZURE_CLIENT_ID}"
 OUT="$HERE/pttool-teams-app.zip"
 TMP="$(mktemp -d)"
 
-# Manifest mit Werten befuellen
+# Manifest mit Werten befüllen
 python3 - "$HERE/manifest.json" "$TMP/manifest.json" "$FRONTEND_HOST" "$AZURE_CLIENT_ID" "$AZURE_APP_ID_URI" <<'PY'
 import json, sys
 src, dst, host, client, app_id_uri = sys.argv[1:6]
@@ -62,12 +62,12 @@ rm -rf "$TMP"
 
 echo "OK -- $OUT"
 echo
-echo "Naechste Schritte:"
+echo "Nächste Schritte:"
 echo "  1. Entra-App-Registration:"
 echo "     Expose an API -> Application ID URI:"
 echo "       $AZURE_APP_ID_URI"
-echo "     Authentication -> Single-page application -> Redirect URI hinzufuegen:"
+echo "     Authentication -> Single-page application -> Redirect URI hinzufügen:"
 echo "       https://$FRONTEND_HOST"
-echo "  2. Teams oeffnen -> Apps -> 'Apps verwalten' -> 'App hochladen'"
-echo "     -> 'Eine App fuer mich oder mein Team hochladen' -> $OUT waehlen"
+echo "  2. Teams öffnen -> Apps -> 'Apps verwalten' -> 'App hochladen'"
+echo "     -> 'Eine App für mich oder mein Team hochladen' -> $OUT wählen"
 echo "  3. App im Sidebar anpinnen, fertig."

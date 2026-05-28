@@ -1,4 +1,4 @@
-// Single Source of Truth fuer die Proxmox-App-Role-Claims — vermeidet die roh
+// Single Source of Truth für die Proxmox-App-Role-Claims — vermeidet die roh
 // verstreuten "Proxmox.Admin"/"Proxmox.Teacher"/"Proxmox.Student"-Literale.
 export const ROLES = {
   ADMIN: "Proxmox.Admin",

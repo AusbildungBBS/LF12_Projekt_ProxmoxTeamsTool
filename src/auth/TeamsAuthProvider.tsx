@@ -22,8 +22,8 @@ import { ROLES, isImpersonatedRole } from "./roles";
 const msalInstance = new PublicClientApplication(msalConfig);
 
 // Mappt HTTP-Status + strukturierten {code} der Bridge auf eine nutzer-
-// verstaendliche Meldung. Ohne das schluckt das Frontend 401/403 von /api/me
-// still und der User sieht eine leere App ohne jede Erklaerung.
+// verständliche Meldung. Ohne das schluckt das Frontend 401/403 von /api/me
+// still und der Benutzer sieht eine leere App ohne jede Erklärung.
 function bridgeAuthErrorMessage(status: number, code?: string): string {
   switch (code) {
     case "not_provisioned":
@@ -54,7 +54,7 @@ type JwtClaims = {
   oid?: string;
 };
 
-// Dekodiert den Payload eines JWT (ohne Signaturpruefung) — NUR zur Anzeige von
+// Dekodiert den Payload eines JWT (ohne Signaturprüfung) — NUR zur Anzeige von
 // Name/Rollen in Teams (dort gibt es kein MSAL-ID-Token). Sicherheit und
 // Autorisierung macht weiterhin die Bridge serverseitig.
 function decodeJwtPayload(token: string | null): JwtClaims | null {
@@ -76,7 +76,7 @@ function decodeJwtPayload(token: string | null): JwtClaims | null {
 }
 
 // Mappt die Teams-Tab-entityId (aus app.getContext().page.id) auf die App-Route,
-// die dieser Tab als Root laedt. Damit erkennt das Layout, ob man am Root des
+// die dieser Tab als Root lädt. Damit erkennt das Layout, ob man am Root des
 // AKTIVEN Tabs ist (Header ausblendbar) oder intern woanders hin navigiert hat.
 function tabRootForEntity(entityId?: string): string {
   switch (entityId) {
@@ -126,11 +126,11 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   // ── EINE normalisierte Session, egal woher der Login kam ───────────────────
   // Zwei Erwerbs-/Refresh-Wege (MSAL im Browser, Teams-SSO im Tab — siehe
-  // getToken()), aber genau EIN normalisiertes Identitaets-Objekt, mit dem der
+  // getToken()), aber genau EIN normalisiertes Identitäts-Objekt, mit dem der
   // Rest arbeitet. Die Bridge-Identity (/api/me) ist autoritativ und reichert
-  // dieses an bzw. ueberschreibt es.
+  // dieses an bzw. überschreibt es.
   const session: AuthSession | null = useMemo(() => {
-    // Browser: das MSAL-Konto ist die Quelle der Wahrheit fuer "angemeldet" —
+    // Browser: das MSAL-Konto ist die Quelle der Wahrheit für "angemeldet" —
     // auch schon, bevor das accessToken still nachgeladen wurde.
     if (user) {
       const c = user.idTokenClaims as JwtClaims | undefined;
@@ -167,7 +167,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
 
   // Rollen: Bridge-Identity autoritativ, sonst aus der normalisierten Session.
   // realRoles = die ECHTEN Rollen (ohne Impersonation), damit der Switcher
-  // erkennt, ob der User wirklich Admin ist.
+  // erkennt, ob der Benutzer wirklich Admin ist.
   const realRoles = identity?.roles ?? session?.roles ?? [];
   const realIsAdmin = realRoles.includes(ROLES.ADMIN);
 
@@ -185,7 +185,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         }
       : null);
 
-  // Die "gefuehlten" Roles fuer die UI: bei aktiver Impersonation ueberschrieben.
+  // Die "gefühlten" Rollen für die UI: bei aktiver Impersonation überschrieben.
   const roles = impersonatedRole ? [impersonatedRole] : realRoles;
   const classes = identity?.classes ?? [];
   const hasRole = (role: string) => roles.includes(role);
@@ -197,12 +197,12 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       const token = await authentication.getAuthToken();
       setAccessToken(token);
 
-      // Optionally exchange token on backend for Graph access
-      // via the On-Behalf-Of flow
+      // Optional kann die Bridge das Token per On-Behalf-Of-Flow gegen
+      // Graph-Zugriff tauschen.
       return token;
     } catch (err) {
-      console.warn("Teams SSO failed, falling back to MSAL popup:", err);
-      setError("Teams SSO failed – try manual login");
+      console.warn("Teams-SSO fehlgeschlagen, weiche auf MSAL aus:", err);
+      setError("Teams-SSO fehlgeschlagen. Bitte manuell anmelden.");
       return null;
     }
   };
@@ -218,7 +218,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     }
   }
 
-  // Detect if running inside Teams
+  // Prüft, ob die App innerhalb von Teams läuft.
   useEffect(() => {
     const initTeams = async () => {
       try {
@@ -236,11 +236,11 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
             displayName: context.user?.displayName,
             upn: context.user?.userPrincipalName,
           });
-          // Try Teams SSO
+          // Teams-SSO versuchen.
           await teamsSSO();
         }
       } catch {
-        // Not in Teams – that's fine, use regular MSAL flow
+        // Nicht in Teams — dann normaler MSAL-Ablauf.
         setIsInTeams(false);
       } finally {
         setLoading(false);
@@ -255,25 +255,26 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
           setAccessToken(response.accessToken);
         }
       } catch (err) {
-        console.error("Redirect handling failed:", err);
+        console.error("Redirect-Verarbeitung fehlgeschlagen:", err);
       }
     };
 
     handleRedirect().then(initTeams);
   }, [instance]);
 
-  // After page refresh we have an account but no token — acquire silently
+  // Nach einem Seiten-Refresh gibt es ein Konto, aber noch kein Token.
+  // Das Token wird still nachgeladen.
   useEffect(() => {
     if (!user || accessToken) return;
     instance
       .acquireTokenSilent({ ...loginRequest, account: user })
       .then((res) => setAccessToken(res.accessToken))
       .catch((err) => {
-        console.warn("Silent token acquisition failed:", err);
+        console.warn("Stille Token-Anforderung fehlgeschlagen:", err);
       });
   }, [user, accessToken, instance]);
 
-  // Once we have an access token, fetch profile + identity from the backend.
+  // Sobald ein Access-Token da ist, Profil + Identität von der Bridge laden.
   // Re-fetcht bei Impersonation-Switch, damit die Server-seitig gerechnete
   // Identity (Klassen-Filter etc.) zur impersonierten Rolle passt.
   useEffect(() => {
@@ -288,7 +289,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         const res = await fetch(apiUrl("/api/me"), { headers });
         if (!res.ok) {
           // Strukturierten {error, code} der Bridge auslesen, damit ein
-          // angemeldeter-aber-nicht-berechtigter User eine klare Meldung sieht
+          // angemeldeter-aber-nicht-berechtigter Benutzer eine klare Meldung sieht
           // statt einer stillen, leeren App.
           let code: string | undefined;
           let serverMsg: string | undefined;
@@ -299,7 +300,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
           } catch {
             /* kein JSON-Body */
           }
-          console.error("Failed to fetch /api/me:", res.status, code ?? serverMsg);
+          console.error("Abruf von /api/me fehlgeschlagen:", res.status, code ?? serverMsg);
           if (!cancelled) {
             setProfile(null);
             setIdentity(null);
@@ -314,7 +315,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
           setError(null);
         }
       } catch (err) {
-        console.error("Failed to fetch /api/me:", err);
+        console.error("Abruf von /api/me fehlgeschlagen:", err);
         if (!cancelled) {
           setError("Verbindung zur Bridge fehlgeschlagen. Bitte später erneut versuchen.");
         }
@@ -326,39 +327,39 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   }, [accessToken, impersonatedRole]);
 
   /**
-   * Login via MSAL redirect (robust in popups, iframes, and webviews).
-   * The page navigates away to login.microsoftonline.com and comes back —
-   * the response is handled by handleRedirectPromise() above.
+   * Anmeldung per MSAL-Redirect (robust in Popups, iFrames und Webviews).
+   * Die Seite navigiert zu login.microsoftonline.com und kommt zurück;
+   * die Antwort verarbeitet handleRedirectPromise() weiter oben.
    */
   const login = async () => {
     try {
       setError(null);
       await instance.loginRedirect(loginRequest);
     } catch (err) {
-      console.error("Login failed:", err);
+      console.error("Anmeldung fehlgeschlagen:", err);
       const msg =
         err instanceof Error
           ? `${(err as { errorCode?: string }).errorCode ?? err.name}: ${err.message}`
-          : "Login failed. Please try again.";
+          : "Anmeldung fehlgeschlagen. Bitte erneut versuchen.";
       setError(msg);
     }
   };
 
   /**
-   * Logout via redirect.
+   * Abmeldung per Redirect.
    */
   const logout = async () => {
     try {
       setAccessToken(null);
       await instance.logoutRedirect();
     } catch (err) {
-      console.error("Logout failed:", err);
+      console.error("Abmeldung fehlgeschlagen:", err);
     }
   };
 
   /**
-   * Hol ein gueltiges Access-Token und aktualisiere den State.
-   * - In Teams: authentication.getAuthToken() (Teams cached/erneuert selbst).
+   * Hol ein gültiges Access-Token und aktualisiere den State.
+   * - In Teams: authentication.getAuthToken() (Teams zwischenspeichert/erneuert selbst).
    * - Im Browser: MSAL acquireTokenSilent (nutzt das Refresh-Token).
    * Wird proaktiv (Timer unten) UND reaktiv (401-Retry im Bridge-Client)
    * aufgerufen, damit Sessions nicht nach ~1 h Token-Ablauf ausfallen.
@@ -379,17 +380,17 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       return response.accessToken;
     } catch (err) {
       if (err instanceof InteractionRequiredAuthError) {
-        // Interaktion noetig (Consent / Refresh-Token abgelaufen). Im Browser
+        // Interaktion nötig (Consent / Refresh-Token abgelaufen). Im Browser
         // zur Anmeldung navigieren; in Teams gibt es keinen Redirect-Flow.
         if (!isInTeams) await instance.acquireTokenRedirect(loginRequest);
         return null;
       }
-      console.error("Token refresh failed:", err);
+      console.error("Token-Aktualisierung fehlgeschlagen:", err);
       return null;
     }
   }, [isInTeams, user, instance]);
 
-  // Proaktiver Refresh: Access-Tokens sind ~60 min gueltig. Alle ~45 min
+  // Proaktiver Refresh: Access-Tokens sind ~60 min gültig. Alle ~45 min
   // zentral erneuern, damit ALLE Consumer (Bridge-API, /api/me, VNC-WebSocket)
   // ein frisches Token sehen. Greift im Browser (MSAL) wie in Teams (SSO).
   useEffect(() => {

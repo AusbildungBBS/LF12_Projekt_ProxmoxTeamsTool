@@ -1,11 +1,11 @@
 import { TAG, tagValue, tagValues, hasTag } from "./tags";
 import type { VM } from "./proxmox";
 
-// Reine Identitaets-, Rollen- und Autorisierungslogik der Bridge — bewusst
+// Reine Identitäts-, Rollen- und Autorisierungslogik der Bridge — bewusst
 // ohne I/O / Express / Seiteneffekte, damit sie isoliert unit-testbar ist.
 // index.ts importiert von hier; die HTTP-Verdrahtung bleibt dort.
 
-// ── Identity / Roles ───────────────────────────────────────────────────────────
+// ── Identität / Rollen ───────────────────────────────────────────────────────────
 
 export type AppRole = "Proxmox.Admin" | "Proxmox.Teacher" | "Proxmox.Student";
 
@@ -32,7 +32,7 @@ export function mapEduRoleToAppRoles(primaryRole?: string): AppRole[] {
   }
 }
 
-// Behaelt nur bekannte Proxmox-App-Roles aus einem rohen roles-Claim.
+// Behält nur bekannte Proxmox-App-Roles aus einem rohen roles-Claim.
 export function filterAppRoles(roles: string[] | undefined): AppRole[] {
   if (!roles) return [];
   const allowed: AppRole[] = ["Proxmox.Admin", "Proxmox.Teacher", "Proxmox.Student"];
@@ -49,7 +49,7 @@ export function isStudent(id: BridgeIdentity): boolean {
   return id.roles.includes("Proxmox.Student");
 }
 
-// Dev-Impersonation (rein): nur ausserhalb prod und nur ein echter Admin darf
+// Dev-Impersonation (rein): nur außerhalb prod und nur ein echter Admin darf
 // eine andere Rolle aufsetzen. Der HTTP-Header-Wrapper lebt in index.ts.
 export function applyImpersonation(
   real: BridgeIdentity,
@@ -64,14 +64,14 @@ export function applyImpersonation(
   return { ...real, roles: [wantedRole as AppRole] };
 }
 
-// ── Authorization ──────────────────────────────────────────────────────────────
+// ── Autorisierung ──────────────────────────────────────────────────────────────
 
-// Visibility — read access auf ein Template.
+// Sichtbarkeit — Lesezugriff auf ein Template.
 export function canSeeTemplate(tpl: VM, id: BridgeIdentity): boolean {
   if (isAdmin(id)) return true;
   if (isTeacher(id)) {
     const ownerOid = tagValue(tpl.tags, TAG.TPL_OWNER_PREFIX);
-    // Ungeclaimte Templates sind fuer jeden Lehrer sichtbar -- sonst koennte
+    // Ungeclaimte Templates sind für jeden Lehrer sichtbar -- sonst könnte
     // er sie nicht via UI claimen.
     if (!ownerOid) return true;
     if (ownerOid === id.oid) return true;

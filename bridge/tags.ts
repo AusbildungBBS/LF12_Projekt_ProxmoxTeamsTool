@@ -1,13 +1,13 @@
 // Tag-Schema (Proxmox VE 8 erlaubt nur [a-z0-9_-] in Tags, daher kein `:`).
 //
-//  Templates (template=1 + pttool-tpl marker):
-//    pttool-tpl            — generic marker, "this is a Pttool-managed template"
+//  Templates (template=1 + pttool-tpl Marker):
+//    pttool-tpl            — generischer Marker, "dies ist ein von Pttool verwaltetes Template"
 //    tpl-owner-<user-oid>  — Lehrer, der das Template erstellt hat
 //    tpl-public            — andere Lehrer dürfen es zuweisen (m:n)
 //    tpl-class-<oid>       — Klassenzuweisung (mehrfach möglich)
 //
-//  VMs (template=0 + pttool marker):
-//    pttool                — generic marker, "this is a Pttool-managed VM"
+//  VMs (template=0 + pttool Marker):
+//    pttool                — generischer Marker, "dies ist eine von Pttool verwaltete VM"
 //    vm-owner-<user-oid>   — Schüler, dem die VM gehört
 //    vm-tpl-<vmid>         — Source-Template-VMID (für Recreate-Action)
 

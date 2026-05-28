@@ -1,14 +1,14 @@
 # ── Backend-Stack: Bridge + Cloudflare-Tunnel ───────────────────────────────
-# Laeuft auf der Proxmox-VM, die das Tool steuert ("Schroedingers Docker": die
-# VM haengt an genau der Proxmox-Installation, die die Bridge verwaltet).
+# Läuft auf der Proxmox-VM, die das Tool steuert ("Schrödingers Docker": die
+# VM hängt an genau der Proxmox-Installation, die die Bridge verwaltet).
 #
 # Starten:
 #   nur die Bridge (z.B. hinter eigenem Reverse-Proxy mit TLS):
 #     docker compose -f docker-compose.backend.yml up -d --build
-#   Bridge + Tunnel (kein offener Inbound-Port noetig, empfohlen im Schulnetz):
+#   Bridge + Tunnel (kein offener Inbound-Port nötig, empfohlen im Schulnetz):
 #     docker compose -f docker-compose.backend.yml --profile tunnel up -d --build
 #
-# Config kommt aus .env (siehe .env.example). Fuer den getrennten Betrieb
+# Config kommt aus .env (siehe .env.example). Für den getrennten Betrieb
 # (Frontend auf Azure Static Web Apps) in .env setzen:
 #   CORS_ALLOWED_ORIGINS=https://<app>.azurestaticapps.net
 #   CF_TUNNEL_TOKEN=<Token aus dem Cloudflare-Zero-Trust-Dashboard>
@@ -26,10 +26,10 @@ services:
     # diese Origins (z.B. die SWA-URL des Frontends), wenn Frontend und Bridge
     # auf verschiedenen Origins liegen.
     env_file: .env
-    # Nur auf Loopback veroeffentlicht: der Tunnel ist der eigentliche Ingress,
-    # eine LAN-/Internet-Exposition entfaellt. cloudflared erreicht die Bridge
-    # ohnehin ueber das interne Compose-Netz als `bridge:3001` (kein Port noetig).
-    # Fuer einen Reverse-Proxy auf einem ANDEREN Host BRIDGE_BIND in .env auf
+    # Nur auf Loopback veröffentlicht: der Tunnel ist der eigentliche Ingress,
+    # eine LAN-/Internet-Exposition entfällt. cloudflared erreicht die Bridge
+    # ohnehin über das interne Compose-Netz als `bridge:3001` (kein Port nötig).
+    # Für einen Reverse-Proxy auf einem ANDEREN Host BRIDGE_BIND in .env auf
     # z.B. 0.0.0.0:3001 setzen.
     ports:
       - "${BRIDGE_BIND:-127.0.0.1:3001}:3001"
@@ -39,8 +39,8 @@ services:
       timeout: 5s
       retries: 3
       start_period: 10s
-    # ── Secrets statt Klartext-Env (empfohlen fuer Prod) ─────────────────────
-    # Die Bridge liest jeden Wert via <NAME> ODER <NAME>_FILE. Fuer Secrets:
+    # ── Secrets statt Klartext-Env (empfohlen für Prod) ─────────────────────
+    # Die Bridge liest jeden Wert via <NAME> ODER <NAME>_FILE. Für Secrets:
     #   1. den top-level `secrets:`-Block unten aktivieren (Dateien anlegen),
     #   2. hier die Secrets mounten + die *_FILE-Pfade setzen,
     #   3. die Klartext-Werte aus .env entfernen (die direkte Env-Var hat sonst
@@ -55,8 +55,8 @@ services:
   # ── Cloudflare Tunnel ──────────────────────────────────────────────────────
   # Macht die Bridge ohne offenen Inbound-Port erreichbar: cloudflared baut nur
   # eine AUSGEHENDE Verbindung (QUIC/HTTPS 443) zur Cloudflare-Edge auf. Nur aktiv
-  # mit `--profile tunnel`, sonst uebersprungen (so bleibt `docker compose up`
-  # im kombinierten Stack ohne Token lauffaehig).
+  # mit `--profile tunnel`, sonst übersprungen (so bleibt `docker compose up`
+  # im kombinierten Stack ohne Token lauffähig).
   #
   # Setup:
   #   1. Cloudflare Dashboard -> Zero Trust -> Networks -> Tunnels -> Create
@@ -65,9 +65,9 @@ services:
   #      api.example.org -> http://bridge:3001 (NICHT hier — Token-/Remote-
   #      Managed-Tunnel haben keine lokale config.yml/ingress).
   #   3. Dieselbe URL als VITE_API_BASE_URL beim Frontend-Build + als
-  #      CORS_ALLOWED_ORIGINS-Gegenstueck (SWA-Origin) hinterlegen.
+  #      CORS_ALLOWED_ORIGINS-Gegenstück (SWA-Origin) hinterlegen.
   cloudflared:
-    # Fuer reproduzierbare Builds auf ein datiertes Tag pinnen (z.B.
+    # Für reproduzierbare Builds auf ein datiertes Tag pinnen (z.B.
     # cloudflare/cloudflared:2025.x.x) und per Renovate/Dependabot nachziehen —
     # `:latest` + --no-autoupdate kann sonst in Cloudflares deprecated-Bereich driften.
     image: cloudflare/cloudflared:latest
@@ -78,27 +78,27 @@ services:
     environment:
       # Token aus .env via Env-Var — NICHT als `--token` im command (landet sonst
       # in `ps`/`/proc/<pid>/cmdline`/`docker inspect`). `:-` (nicht `:?`), damit
-      # ein Parsen ohne aktives Profil nicht fehlschlaegt; fehlt der Token bei
+      # ein Parsen ohne aktives Profil nicht fehlschlägt; fehlt der Token bei
       # aktivem --profile tunnel, bricht cloudflared zur Laufzeit klar ab.
       # (Ab cloudflared >= 2025.4.0 alternativ TUNNEL_TOKEN_FILE + Docker-Secret.)
       TUNNEL_TOKEN: "${CF_TUNNEL_TOKEN:-}"
       # Metrics-Server binden, damit der distroless-taugliche Healthcheck
       # (`cloudflared tunnel ready`) das /ready-Endpoint erreicht.
       TUNNEL_METRICS: "127.0.0.1:2000"
-    # KEIN ports: — cloudflared ist rein ausgehend. Inbound-Ports waeren falsch
-    # und wuerden das Sicherheitsmodell des Tunnels aushebeln.
+    # KEIN ports: — cloudflared ist rein ausgehend. Inbound-Ports wären falsch
+    # und würden das Sicherheitsmodell des Tunnels aushebeln.
     depends_on:
       bridge:
         condition: service_healthy
     healthcheck:
       # Nativ + distroless-tauglich (cloudflared >= 2024.11, PR #1135): kein
-      # wget/curl im Image noetig. Metrics-Adresse muss zu TUNNEL_METRICS passen.
+      # wget/curl im Image nötig. Metrics-Adresse muss zu TUNNEL_METRICS passen.
       test: ["CMD", "cloudflared", "--metrics", "127.0.0.1:2000", "tunnel", "ready"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 15s
-    # ── Hardening (alles unbedenklich fuer cloudflared) ──────────────────────
+    # ── Hardening (alles unbedenklich für cloudflared) ──────────────────────
     read_only: true
     tmpfs:
       - /tmp
@@ -107,10 +107,10 @@ services:
     security_opt:
       - no-new-privileges:true
 
-# ── Secrets (optional, fuer Prod statt Klartext-Env) ─────────────────────────
+# ── Secrets (optional, für Prod statt Klartext-Env) ─────────────────────────
 # Lege je Secret eine Datei mit dem reinen Wert an (z.B.
-# ./secrets/azure_client_secret) und aktiviere die `secrets:`-Bloecke oben am
-# bridge-Service. Gilt fuer beide Tiers: <NAME> (Env) ODER <NAME>_FILE (Datei).
+# ./secrets/azure_client_secret) und aktiviere die `secrets:`-Blöcke oben am
+# bridge-Service. Gilt für beide Tiers: <NAME> (Env) ODER <NAME>_FILE (Datei).
 # secrets:
 #   azure_client_secret:
 #     file: ./secrets/azure_client_secret

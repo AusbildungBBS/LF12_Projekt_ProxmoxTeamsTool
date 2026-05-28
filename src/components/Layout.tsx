@@ -3,46 +3,43 @@ import { useAuth } from "../auth/authContext";
 import { useRoleFlags } from "../auth/useRoleFlags";
 import { ErrorCard } from "./ErrorCard";
 
-// Label des Rueckweg-Links zum jeweiligen Teams-Tab-Root (Pfad -> Anzeigename).
+// Label des Rückweg-Links zum jeweiligen Teams-Tab-Root (Pfad -> Anzeigename).
 const TEAMS_TAB_LABELS: Record<string, string> = {
   "/": "Übersicht",
-  "/templates": "Templates",
+  "/templates": "Vorlagen",
   "/my-vms": "Meine VMs",
 };
 
 export function Layout() {
-  const { isAuthenticated, isInTeams, realIsAdmin, teamsTabRoot, error } =
-    useAuth();
+  const { isAuthenticated, isInTeams, teamsTabRoot, error } = useAuth();
   const { isAdmin, isStaff } = useRoleFlags();
   const { pathname } = useLocation();
 
-  // In Teams navigiert man ueber die statischen Teams-Tabs (Proxmox/Templates/
-  // Meine VMs) — diese Eintraege blenden wir aus der App-Nav aus und zeigen nur
-  // Ziele OHNE Tab (Klassen/Admin). Hat die Rolle keinen solchen Eintrag, gibt
-  // es nichts zu navigieren: dann blenden wir den ganzen Header inkl. Brand aus
-  // (Titel + Identitaet liefert Teams selbst).
+  // Rollenspezifische Nav-Einträge (Klassen/Admin) richten sich nach der
+  // EFFEKTIVEN Rolle — eine per Rollenwechsel emulierte Rolle färbt also AUCH die
+  // Nav, auf BEIDEN Plattformen gleich: Admin emuliert Schüler -> Klassen/Admin
+  // verschwinden, genau wie beim echten Schüler. Zurück kommt der Admin über den
+  // Rollen-Switcher in der Profilleiste — der bleibt sichtbar, weil er an der
+  // ECHTEN Adminrolle hängt (siehe UserProfile / realIsAdmin).
   //
-  // WICHTIG: In Teams richten sich Header UND diese Nav-Eintraege nach der
-  // ECHTEN Rolle (realIsAdmin), nicht nach einer per "View as" emulierten.
-  // Sonst verloere ein Admin, der einen Schueler emuliert, in Teams seinen
-  // Header + Navigation + den Zugang zum Rollen-Switcher. Emulation faerbt nur
-  // Daten/Content, nicht das Admin-Chrome. (Nur Admins koennen emulieren, daher
-  // deckt realIsAdmin den Fall ab.) Im Browser bleibt die effektive Rolle.
-  const navStaff = isInTeams ? isStaff || realIsAdmin : isStaff;
-  const navAdmin = isInTeams ? realIsAdmin : isAdmin;
+  // In Teams kommen Übersicht/Vorlagen/Meine VMs über die statischen
+  // Teams-Tabs — die blenden wir aus der App-Nav aus (s.u.) und zeigen nur Ziele
+  // OHNE Tab (Klassen/Admin).
+  const navStaff = isStaff;
+  const navAdmin = isAdmin;
 
   // Root-Route + Label des AKTIVEN Teams-Tabs. Der aktive Tab kommt aus
   // getContext (teamsTabRoot), NICHT aus dem Pfad: ein per Dashboard-Karte
-  // erreichtes /templates zaehlt so nicht als Tab-Root (aktiver Tab ist Proxmox)
+  // erreichtes /templates zählt so nicht als Tab-Root (aktiver Tab ist Proxmox)
   // -> man strandet nicht.
   const tabRoot = teamsTabRoot ?? "/";
   const tabLabel = TEAMS_TAB_LABELS[tabRoot] ?? "Übersicht";
   const atTabRoot = isInTeams && pathname === tabRoot;
-  // In Teams: Rueckweg-Link zum Root des AKTIVEN Tabs (z.B. "Templates"), sobald
+  // In Teams: Rückweg-Link zum Root des AKTIVEN Tabs (z.B. "Vorlagen"), sobald
   // man nicht dort ist — NICHT stur "Übersicht"/Dashboard. Im Browser zeigt die
   // volle Nav ohnehin alle Ziele.
   const showReturnLink = isInTeams && !atTabRoot;
-  // Header nur anzeigen, wenn er ueberhaupt einen Button haette (Rueckweg ODER
+  // Header nur anzeigen, wenn er überhaupt einen Button hätte (Rückweg ODER
   // Rollen-Nav). Sonst (leerer Header) ausblenden — inkl. Brand.
   const showHeader =
     !isInTeams || (isAuthenticated && (showReturnLink || navStaff));
@@ -60,9 +57,9 @@ export function Layout() {
             </div>
             {isAuthenticated && (
               <nav className="app-nav">
-                {/* In Teams: EIN Rueckweg-Link zum Root des aktiven Tabs (mit
+                {/* In Teams: EIN Rückweg-Link zum Root des aktiven Tabs (mit
                     dessen Label), sichtbar sobald man nicht dort ist. Im Browser
-                    die volle Nav — in Teams haben Uebersicht/Meine VMs/Templates
+                    die volle Nav — in Teams haben Übersicht/Meine VMs/Vorlagen
                     eigene Teams-Tabs. */}
                 {isInTeams ? (
                   showReturnLink && (
@@ -74,7 +71,7 @@ export function Layout() {
                   <>
                     <NavLink to="/" end>Übersicht</NavLink>
                     <NavLink to="/my-vms">Meine VMs</NavLink>
-                    <NavLink to="/templates">Templates</NavLink>
+                    <NavLink to="/templates">Vorlagen</NavLink>
                   </>
                 )}
                 {navStaff && <NavLink to="/classes">Klassen</NavLink>}

@@ -1,24 +1,24 @@
 import type { ProxmoxClient } from "./proxmox";
 
-// Active-class whitelist. A Group becomes a "Pttool-Klasse" by virtue of
-// at least one template in Proxmox being tagged `tpl-class-<group-oid>`.
-// Without such a tag the group is just an M365 group from the user's
-// `groups`-claim and gets filtered out — keeps "All Company" etc. out of
-// the UI even though the user is technically a member.
+// Whitelist aktiver Klassen. Eine Group wird zu einer "Pttool-Klasse" dadurch,
+// dass mindestens ein Template in Proxmox mit `tpl-class-<group-oid>` getaggt ist.
+// Ohne ein solches Tag ist die Gruppe nur eine M365-Gruppe aus dem
+// `groups`-Claim des Benutzers und wird herausgefiltert — hält "All Company" usw. aus
+// der UI heraus, auch wenn der Benutzer technisch gesehen Mitglied ist.
 
 const ACTIVE_CLASS_CACHE_TTL_MS = 5 * 60 * 1000;
 let cache: { oids: Set<string>; expiresAt: number } | null = null;
 
-// Proxmox VE 8 restricts tags to [a-z0-9_-]+ — no colons. We use `-` as the
-// key/value separator instead of `:`. OIDs are UUIDs (also containing dashes),
-// so we recognize via `startsWith(TAG_PREFIX)` and slice the prefix off.
+// Proxmox VE 8 beschränkt Tags auf [a-z0-9_-]+ — keine Doppelpunkte. Wir verwenden `-` als
+// Schlüssel/Wert-Trenner anstelle von `:`. OIDs sind UUIDs (die ebenfalls Bindestriche enthalten),
+// daher erkennen wir sie über `startsWith(TAG_PREFIX)` und schneiden das Präfix ab.
 const TAG_PREFIX = "tpl-class-";
 
 export async function getActiveClassOids(
   client: ProxmoxClient | null
 ): Promise<Set<string> | null> {
-  // No client configured -> no filter -> bridge passes all groups through.
-  // Useful in dev before Proxmox is wired up.
+  // Kein Client konfiguriert -> kein Filter -> Bridge reicht alle Gruppen durch.
+  // Nützlich in der Entwicklung, bevor Proxmox angebunden ist.
   if (!client) return null;
 
   if (cache && cache.expiresAt > Date.now()) return cache.oids;
@@ -37,7 +37,7 @@ export async function getActiveClassOids(
   return oids;
 }
 
-// For tests / debug endpoints — drop the cache so the next call hits Proxmox.
+// Für Tests / Debug-Endpoints — Cache verwerfen, damit der nächste Aufruf Proxmox erreicht.
 export function clearActiveClassCache(): void {
   cache = null;
 }

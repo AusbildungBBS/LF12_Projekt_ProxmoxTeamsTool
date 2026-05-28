@@ -23,7 +23,7 @@ export interface VmDTO {
   sourceTemplate: { vmid: number; name: string | null } | null;
   cpus?: number;
   maxmem?: number;
-  // Live-Stats — nur fuer running VMs gesetzt.
+  // Live-Statistiken — nur für laufende VMs gesetzt.
   cpu?: number;          // 0..1 (current, ~Wenige-Sekunden-Mittel)
   mem?: number;          // bytes (current)
   cpuAvg5m?: number;     // 0..1 (Durchschnitt letzte ~5 min, aus Proxmox-RRD)
@@ -63,7 +63,7 @@ export function useBridgeApi() {
     }
 
     async function call<T>(url: string, init?: RequestInit): Promise<T> {
-      // apiUrl() praefixt die absolute Bridge-Origin, falls konfiguriert
+      // apiUrl() ergänzt die absolute Bridge-Origin, falls konfiguriert
       // (sonst bleibt der Pfad relativ/same-origin). Siehe ../config/runtime.
       let r = await fetch(apiUrl(url), {
         ...init,

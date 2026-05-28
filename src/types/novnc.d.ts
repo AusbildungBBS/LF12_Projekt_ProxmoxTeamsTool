@@ -1,5 +1,5 @@
-// Minimal type stubs for @novnc/novnc/core/rfb.js — the upstream package
-// ships only JS plus JSDoc, no proper .d.ts.
+// Minimale Typ-Stubs für @novnc/novnc/core/rfb.js — das Upstream-Paket liefert
+// nur JS plus JSDoc, kein echtes .d.ts.
 
 declare module "@novnc/novnc" {
   export default class RFB {

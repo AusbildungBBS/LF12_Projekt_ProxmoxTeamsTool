@@ -3,7 +3,7 @@ import type { VmDTO } from "../api/bridge";
 
 export const REFRESH_INTERVAL_MS = 5000;
 
-// Pollt `refresh` alle intervalMs, solange mindestens eine VM laeuft — sonst
+// Pollt `refresh` alle intervalMs, solange mindestens eine VM läuft — sonst
 // nicht. `vms` darf null/undefined sein (wird als leer behandelt).
 export function useVmAutoRefresh(
   vms: VmDTO[] | null | undefined,

@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 
-// Platzhalter-Seite fuer die im Teams-Manifest referenzierte privacyUrl
+// Platzhalter-Seite für die im Teams-Manifest referenzierte privacyUrl
 // (/privacy). Kein rechtsverbindlicher Text — bewusst locker gehalten.
 export function PrivacyPage() {
   return (
@@ -14,13 +14,12 @@ export function PrivacyPage() {
       <div className="card">
         <p>
           Dieses Tool ist ein Ausbildungsprojekt (LF12). Wir sammeln keine Daten,
-          die wir nicht brauchen — und ehrlich gesagt hatten wir noch keine Zeit,
-          hier echten Juristen-Text reinzuschreiben.
+          die für die Anmeldung und VM-Zuordnung nicht benötigt werden.
         </p>
         <p>
           Deine Microsoft-Anmeldung nutzen wir ausschließlich, um dir deine VMs
-          und Templates zu zeigen. Keine Tracking-Pixel, keine Cookie-Monster,
-          kein Datenverkauf an Außerirdische. 🛸
+          und Vorlagen zu zeigen. Es gibt keine Tracking-Pixel, keine
+          Werbe-Cookies und keinen Datenverkauf.
         </p>
         <p>
           <Link to="/">← Zurück zur Übersicht</Link>

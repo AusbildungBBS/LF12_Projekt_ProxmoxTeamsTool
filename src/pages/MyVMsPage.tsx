@@ -75,7 +75,7 @@ export function MyVMsPage() {
     })();
   }, [accessToken, refresh]);
 
-  // Auto-Refresh fuer Live-Stats: wenn mindestens eine VM laeuft, alle 5 s.
+  // Auto-Refresh für Live-Stats: wenn mindestens eine VM läuft, alle 5 s.
   useVmAutoRefresh(vms, refresh);
 
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
@@ -84,8 +84,8 @@ export function MyVMsPage() {
     vm: VmDTO,
     action: "start" | "shutdown" | "stop" | "delete"
   ) {
-    if (action === "delete" && !confirm(`VM "${vm.name}" wirklich loeschen?`)) return;
-    if (action === "stop" && !confirm(`VM "${vm.name}" hart stoppen (Plug pull)?`)) return;
+    if (action === "delete" && !confirm(`VM "${vm.name}" wirklich löschen?`)) return;
+    if (action === "stop" && !confirm(`VM "${vm.name}" hart stoppen (Strom trennen)?`)) return;
     setBusyId(vm.vmid);
     setError(null);
     try {
@@ -111,8 +111,8 @@ export function MyVMsPage() {
         <h2>{isStudent ? "Meine VMs" : "VMs deiner Klassen"}</h2>
         <p className="page-subtitle">
           {isStudent
-            ? "Deine eigenen VMs, eine pro zugewiesenem Template."
-            : "Schueler-VMs aus den Klassen, die du betreust."}
+            ? "Deine eigenen VMs, eine pro zugewiesener Vorlage."
+            : "Schüler-VMs aus den Klassen, die du betreust."}
         </p>
       </header>
 
@@ -123,8 +123,8 @@ export function MyVMsPage() {
         <EmptyCard>
           <p>
             Aktuell keine VMs in deinem Sichtbereich. {isStudent
-              ? "Klick auf der Templates-Seite auf \"VM aus diesem Template anlegen\"."
-              : "Schueler in deinen Klassen haben noch keine VMs erstellt."}
+              ? "Klick auf der Vorlagen-Seite auf \"VM aus dieser Vorlage anlegen\"."
+              : "Schüler in deinen Klassen haben noch keine VMs erstellt."}
           </p>
         </EmptyCard>
       )}
@@ -141,7 +141,7 @@ export function MyVMsPage() {
               <div className="card-meta">
                 {v.sourceTemplate && (
                   <span>
-                    aus Template{" "}
+                    aus Vorlage{" "}
                     <Link to={`/templates#template-${v.sourceTemplate.vmid}`}>
                       {v.sourceTemplate.name ?? `VMID ${v.sourceTemplate.vmid}`}
                     </Link>
@@ -149,7 +149,7 @@ export function MyVMsPage() {
                 )}
                 <span>{v.cpus ?? "?"} vCPU</span>
                 <span>{v.maxmem ? bytesToMb(v.maxmem) + " MB" : "? MB"}</span>
-                <span>Node {v.node}</span>
+                <span>Knoten {v.node}</span>
                 {v.uptime !== undefined && v.uptime > 0 && (
                   <span title="Laufzeit seit letztem Start">
                     ⏱ {formatUptime(v.uptime)}
@@ -186,7 +186,7 @@ export function MyVMsPage() {
                 </button>
                 <button
                   className="icon-button"
-                  aria-label="Shutdown"
+                  aria-label="Herunterfahren"
                   title="Sauberes Herunterfahren (Guest-Agent)"
                   data-tooltip="Sauber herunterfahren"
                   disabled={busyId === v.vmid || v.status !== "running"}
@@ -196,8 +196,8 @@ export function MyVMsPage() {
                 </button>
                 <button
                   className="icon-button"
-                  aria-label="Stop (hart)"
-                  title="Hart stoppen — Plug pull"
+                  aria-label="Stopp (hart)"
+                  title="Hart stoppen — Strom trennen"
                   data-tooltip="Hart stoppen"
                   disabled={busyId === v.vmid || v.status === "stopped"}
                   onClick={() => run(v, "stop")}
@@ -206,9 +206,9 @@ export function MyVMsPage() {
                 </button>
                 <button
                   className="icon-button"
-                  aria-label="Console"
-                  title="VNC-Console oeffnen"
-                  data-tooltip="Console oeffnen"
+                  aria-label="Konsole"
+                  title="VNC-Konsole öffnen"
+                  data-tooltip="Konsole öffnen"
                   disabled={busyId === v.vmid || v.status !== "running"}
                   onClick={() => openConsole(v)}
                 >
@@ -216,9 +216,9 @@ export function MyVMsPage() {
                 </button>
                 <button
                   className="icon-button danger"
-                  aria-label="Loeschen"
-                  title="Loeschen"
-                  data-tooltip="Loeschen"
+                  aria-label="Löschen"
+                  title="Löschen"
+                  data-tooltip="Löschen"
                   disabled={busyId === v.vmid}
                   onClick={() => run(v, "delete")}
                 >

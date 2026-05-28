@@ -17,7 +17,7 @@ const ROLE_CLAIM_MAP: Record<DevRole, RoleClaim> = {
 const FAKE_PROFILES: Record<DevRole, GraphProfile> = {
   admin: {
     id: "dev-admin",
-    displayName: "Dev Admin",
+    displayName: "Dev-Admin",
     mail: "admin@dev.local",
     userPrincipalName: "admin@dev.local",
     jobTitle: "IT-Administration",
@@ -25,7 +25,7 @@ const FAKE_PROFILES: Record<DevRole, GraphProfile> = {
   },
   teacher: {
     id: "dev-teacher",
-    displayName: "Dev Lehrer",
+    displayName: "Dev-Lehrer",
     mail: "lehrer@dev.local",
     userPrincipalName: "lehrer@dev.local",
     jobTitle: "Lehrkraft",
@@ -33,7 +33,7 @@ const FAKE_PROFILES: Record<DevRole, GraphProfile> = {
   },
   student: {
     id: "dev-student",
-    displayName: "Dev Schüler",
+    displayName: "Dev-Schüler",
     mail: "schueler@dev.local",
     userPrincipalName: "schueler@dev.local",
     jobTitle: "Auszubildende:r",
@@ -120,14 +120,14 @@ function DevAuthBanner({ role }: { role: DevRole }) {
 
   return (
     <div className="dev-auth-banner">
-      <strong>DEV-MODE</strong> · eingeloggt als <em>{role}</em> ·
-      switch:{" "}
+      <strong>DEV-MODUS</strong> · eingeloggt als <em>{role}</em> ·
+      wechseln:{" "}
       {VALID_ROLES.filter((r) => r !== role).map((r) => (
         <button key={r} onClick={() => switchTo(r)}>
           {r}
         </button>
       ))}
-      <button onClick={() => switchTo("off")}>logout</button>
+      <button onClick={() => switchTo("off")}>abmelden</button>
     </div>
   );
 }

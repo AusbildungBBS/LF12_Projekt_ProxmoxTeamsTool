@@ -8,14 +8,14 @@ import {
 
 // Laufzeit-Config (Client-/Tenant-ID, API-Basis) lebt zentral in ./runtime.ts:
 // dort wird window.__APP_CONFIG__ ausgelesen (Container) mit Fallback auf die
-// VITE_*-Build-Env (Dev/SWA-Build). So ist EIN Image/Build fuer alle Umgebungen
+// VITE_*-Build-Env (Dev/SWA-Build). So ist EIN Image/Build für alle Umgebungen
 // konfigurierbar.
 
 /**
- * MSAL configuration for Azure AD authentication.
+ * MSAL-Konfiguration für die Azure-AD-Anmeldung.
  *
- * Required: Register an app in Azure Portal (Microsoft Entra ID)
- * and set the environment variables accordingly.
+ * Voraussetzung: App im Azure Portal (Microsoft Entra ID) registrieren
+ * und die Umgebungsvariablen passend setzen.
  */
 export const msalConfig: Configuration = {
   auth: {
@@ -51,23 +51,23 @@ export const msalConfig: Configuration = {
 };
 
 /**
- * The custom scope exposed by our backend API in Azure App Registration
- * (configured under "Expose an API" → access_as_user).
+ * Der eigene Scope der Backend-API aus der Azure-App-Registrierung
+ * (konfiguriert unter "Expose an API" → access_as_user).
  *
- * The frontend requests a token for THIS scope. The backend then exchanges
- * it via the On-Behalf-Of flow for a Microsoft Graph token.
+ * Das Frontend fordert ein Token für genau diesen Scope an. Das Backend tauscht
+ * es danach per On-Behalf-Of-Flow gegen ein Microsoft-Graph-Token.
  */
 const apiScope = `${AZURE_APP_ID_URI}/access_as_user`;
 
 /**
- * Scopes for the initial login request.
+ * Scopes für die erste Anmeldung.
  */
 export const loginRequest = {
   scopes: [apiScope],
 };
 
 /**
- * Microsoft Graph API endpoint (called server-side via OBO).
+ * Microsoft-Graph-API-Endpunkt (serverseitiger Aufruf via OBO).
  */
 export const graphConfig = {
   graphMeEndpoint: "https://graph.microsoft.com/v1.0/me",

@@ -1,21 +1,21 @@
-/* ── Design Tokens ────────────────────────────────────────────────────────────
- * Teams-inspired neutral palette + Proxmox orange as a single accent
- * (reserved for VM-status / Proxmox-specific affordances).
+/* ── Design-Variablen ─────────────────────────────────────────────────────────
+ * Von Teams inspirierte neutrale Palette + Proxmox-Orange als einzelner Akzent
+ * (reserviert für VM-Status / Proxmox-spezifische Bedienhinweise).
  */
 
 :root {
-  /* Teams purple (Fluent v8 brand-primary) */
+  /* Teams-Violett (Fluent v8 brand-primary) */
   --primary: #6264a7;
   --primary-hover: #4f52a8;
   --primary-active: #444791;
   --primary-soft: #ebebf5;
   --primary-soft-hover: #d8d8ed;
 
-  /* Proxmox orange — sparingly, for VM/cluster status */
+  /* Proxmox-Orange — sparsam, für VM-/Cluster-Status */
   --accent: #e57000;
   --accent-soft: #fff1e0;
 
-  /* Neutrals */
+  /* Neutrale Farben */
   --bg: #f5f5f5;
   --bg-elevated: #ffffff;
   --border: #e1dfdd;
@@ -33,7 +33,7 @@
   --warning: #b88217;
   --warning-soft: #fff4ce;
 
-  /* Radius & shadow (Fluent depth) */
+  /* Radius und Schatten (Fluent depth) */
   --radius: 6px;
   --radius-lg: 8px;
   --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.04), 0 0 2px rgba(0, 0, 0, 0.06);
@@ -41,7 +41,7 @@
   --shadow-8: 0 4px 8px rgba(0, 0, 0, 0.08), 0 0 2px rgba(0, 0, 0, 0.06);
 }
 
-/* ── Reset / Base ─────────────────────────────────────────────────────────── */
+/* ── Reset / Basis ────────────────────────────────────────────────────────── */
 
 * {
   margin: 0;
@@ -421,7 +421,7 @@ a:hover {
   border-color: var(--text-disabled);
 }
 
-/* ── Welcome / Login ──────────────────────────────────────────────────────── */
+/* ── Willkommen / Anmeldung ───────────────────────────────────────────────── */
 
 .welcome {
   background: var(--bg-elevated);
@@ -623,7 +623,7 @@ a:hover {
   100% { box-shadow: 0 0 0 12px rgba(91, 106, 208, 0); }
 }
 
-/* ── Console page ────────────────────────────────────────────────────────── */
+/* ── Konsolenseite ───────────────────────────────────────────────────────── */
 .console-page { gap: 0.75rem; }
 .console-canvas-wrap {
   background: #000;
@@ -731,7 +731,7 @@ a:hover {
 }
 
 /* Tooltips erscheinen sofort beim Hover -- standard title-Attribute haben
-   ~1s Verzoegerung in den meisten Browsern. */
+   ~1s Verzögerung in den meisten Browsern. */
 .icon-button[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
@@ -781,7 +781,7 @@ a:hover {
 }
 .console-toolbar .icon-button:hover:not(:disabled) { background: #3a3a3a; }
 
-/* Wide variant fuer Text-Icons wie "CAD", "Esc", "F1" */
+/* Breite Variante für Text-Icons wie "CAD", "Esc", "F1" */
 .icon-button.wide {
   width: auto;
   min-width: 40px;
@@ -849,8 +849,8 @@ a:hover {
   bottom: 0;
   z-index: 10;
 }
-/* Override des Default-Themes von simple-keyboard, damit es ins dunkle
-   Console-Layout passt. */
+/* Überschreibt das Standard-Theme von simple-keyboard, damit es ins dunkle
+   Konsolen-Layout passt. */
 .simple-keyboard.pttool-kbd {
   background: transparent;
   max-width: 100%;
@@ -880,11 +880,11 @@ a:hover {
   margin-bottom: 0;
 }
 
-/* Badge-Varianten fuer Template-Status */
+/* Badge-Varianten für Vorlagen-Status */
 .badge.badge-unclaimed { background: #ffeaa3; color: #6b4d00; }
 .badge.badge-own       { background: #d8e2ff; color: #1f3b95; }
 
-/* Inline-Edit-Bereich auf Template-Karte */
+/* Inline-Edit-Bereich auf Vorlagen-Karte */
 .card-edit {
   margin-top: 0.8rem;
   padding-top: 0.8rem;
@@ -1011,7 +1011,7 @@ a:hover {
 }
 .inline-icon-link:hover { background: var(--primary-soft); border-radius: 4px; }
 
-/* Home-Page: Inline-Listen in den Lehrer/Schueler-Cards */
+/* Startseite: Inline-Listen in den Lehrer/Schüler-Karten */
 .home-inline {
   list-style: none;
   padding: 0;
@@ -1030,7 +1030,7 @@ a:hover {
 }
 .home-inline .muted { color: var(--text-secondary); font-size: 0.85rem; }
 
-/* Mini-Link im Card-Header ("verwalten →") fuer Admin-Grid */
+/* Mini-Link im Card-Header ("verwalten →") für Admin-Grid */
 .card-section-link {
   float: right;
   font-size: 0.82rem;
@@ -1093,7 +1093,7 @@ a:hover {
 }
 .btn.btn-sm:hover { background: var(--primary-soft); border-color: var(--primary); color: var(--primary); }
 
-/* Impersonate-Switcher in der Profile-Bar (nur fuer echte Admins) */
+/* Impersonate-Switcher in der Profile-Bar (nur für echte Admins) */
 .impersonate-select {
   display: inline-flex;
   align-items: center;

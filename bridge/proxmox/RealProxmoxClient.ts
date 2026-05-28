@@ -11,9 +11,9 @@ import type {
   VMStatus,
 } from "./types";
 
-// HTTP client against a Proxmox VE cluster, authenticated via API token.
-// Token auth bypasses CSRF (the Cookie+CSRFPreventionToken dance is only
-// required for ticket auth) — see https://pve.proxmox.com/wiki/Proxmox_VE_API.
+// HTTP-Client gegen ein Proxmox-VE-Cluster, authentifiziert über API-Token.
+// Token-Auth umgeht CSRF (der Cookie+CSRFPreventionToken-Tanz ist nur
+// für die Ticket-Auth erforderlich) — siehe https://pve.proxmox.com/wiki/Proxmox_VE_API.
 
 export interface RealProxmoxClientOptions {
   baseUrl: string;
@@ -38,7 +38,7 @@ export class RealProxmoxClient implements ProxmoxClient {
     });
   }
 
-  // ── Discovery ────────────────────────────────────────────────────────────
+  // ── Erkennung ────────────────────────────────────────────────────────────
 
   async listNodes(): Promise<string[]> {
     const r = await this.http.get<{ data: Array<{ node: string }> }>("/nodes");
@@ -139,7 +139,7 @@ export class RealProxmoxClient implements ProxmoxClient {
     });
   }
 
-  // ── Config / tags ────────────────────────────────────────────────────────
+  // ── Konfiguration / Tags ─────────────────────────────────────────────────
 
   async updateConfig(node: string, vmid: VMID, patch: VMConfig): Promise<void> {
     const body = new URLSearchParams();
@@ -169,7 +169,7 @@ export class RealProxmoxClient implements ProxmoxClient {
     };
   }
 
-  // ── Internals ────────────────────────────────────────────────────────────
+  // ── Interne Hilfsmethoden ──────────────────────────────────────────────────
 
   private async taskAction(
     node: string,
@@ -184,7 +184,7 @@ export class RealProxmoxClient implements ProxmoxClient {
   }
 }
 
-// ── Helpers ────────────────────────────────────────────────────────────────
+// ── Hilfsfunktionen ──────────────────────────────────────────────────────────
 
 interface ClusterResource {
   vmid: number;
@@ -257,8 +257,8 @@ function mapStatus(s?: string): VMStatus {
   }
 }
 
-// Proxmox VE 7 used ";" as tag separator; VE 8 accepts both "," and ";".
-// Be permissive when reading, but normalize on write.
+// Proxmox VE 7 verwendete ";" als Tag-Trennzeichen; VE 8 akzeptiert sowohl "," als auch ";".
+// Beim Lesen tolerant sein, beim Schreiben aber normalisieren.
 export function parseTags(raw?: string): string[] {
   if (!raw) return [];
   return raw

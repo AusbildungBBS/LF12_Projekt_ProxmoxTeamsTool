@@ -3,10 +3,10 @@
 // Im Container injiziert der Entrypoint (docker-entrypoint.frontend.sh) ein
 // window.__APP_CONFIG__ nach /config.js — aus den Compose-Env-Vars/Secrets.
 // Lokal in der Dev bleibt window.__APP_CONFIG__ leer -> Fallback auf die
-// VITE_*-Build-Env. So ist EIN Image fuer alle Umgebungen konfigurierbar.
+// VITE_*-Build-Env. So ist EIN Image für alle Umgebungen konfigurierbar.
 //
 // Diese Datei ist die EINZIGE Stelle, die window.__APP_CONFIG__ typisiert und
-// ausliest — alle anderen Module importieren die aufgeloesten Werte hier.
+// ausliest — alle anderen Module importieren die aufgelösten Werte hier.
 declare global {
   interface Window {
     __APP_CONFIG__?: {
@@ -41,7 +41,7 @@ function defaultAppIdUri(): string {
     host.startsWith("localhost") || host.startsWith("127.0.0.1");
 
   // Teams SSO erwartet bei gehosteten Tabs api://<frontend-host>/<client-id>.
-  // Fuer lokale Browser-Entwicklung bleibt der alte Default ohne Host nutzbar.
+  // Für lokale Browser-Entwicklung bleibt der alte Default ohne Host nutzbar.
   return isLocalhost
     ? `api://${AZURE_CLIENT_ID}`
     : `api://${host}/${AZURE_CLIENT_ID}`;
@@ -63,9 +63,9 @@ function normalizeApiBase(raw: string): string {
   const trimmed = raw.trim().replace(/\/+$/, ""); // Trailing-Slashes weg; "" bleibt "".
   if (!trimmed) return "";
   // Ohne Schema ist der Wert KEIN absolutes Origin, sondern ein relativer Pfad:
-  // fetch haengt ihn an die Frontend-Origin (.../api.example.org/api/me) und
+  // fetch hängt ihn an die Frontend-Origin (.../api.example.org/api/me) und
   // `new URL(...)` in wsUrl() wirft. Fehlt das Schema, https:// annehmen (Prod
-  // laeuft ueber TLS).
+  // läuft über TLS).
   if (!/^https?:\/\//i.test(trimmed)) return `https://${trimmed}`;
   return trimmed;
 }
@@ -74,13 +74,13 @@ export const API_BASE_URL = normalizeApiBase(
   runtimeConfig.API_BASE_URL || import.meta.env.VITE_API_BASE_URL || ""
 );
 
-// Baut die HTTP-URL fuer einen API-Pfad. `path` ist ein absoluter App-Pfad wie
+// Baut die HTTP-URL für einen API-Pfad. `path` ist ein absoluter App-Pfad wie
 // "/api/templates". Bei leerer Basis bleibt der Pfad relativ (same-origin).
 export function apiUrl(path: string): string {
   return `${API_BASE_URL}${path}`;
 }
 
-// Baut die ws(s)://-URL fuer einen WebSocket-Pfad. Mit gesetzter Basis lebt der
+// Baut die ws(s)://-URL für einen WebSocket-Pfad. Mit gesetzter Basis lebt der
 // WebSocket auf der Bridge-Origin; sonst Fallback auf die aktuelle Seiten-Origin.
 export function wsUrl(path: string): string {
   const httpBase =

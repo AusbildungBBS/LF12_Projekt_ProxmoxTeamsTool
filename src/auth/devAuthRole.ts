@@ -1,14 +1,14 @@
-// Dev-only auth bypass — Rollen-Erkennung aus URL / localStorage / env.
-// Enabled via:
-//   - URL param `?devauth=admin|teacher|student` (one-time, stores in localStorage)
-//   - or localStorage.dev_auth_role = "admin" | "teacher" | "student"
-//   - or VITE_DEV_FAKE_AUTH env at build time
-// Tear down with `?devauth=off`.
+// Auth-Bypass nur für die Entwicklung — Rollen-Erkennung aus URL / localStorage / env.
+// Aktiviert über:
+//   - URL-Parameter `?devauth=admin|teacher|student` (einmalig, speichert in localStorage)
+//   - oder localStorage.dev_auth_role = "admin" | "teacher" | "student"
+//   - oder VITE_DEV_FAKE_AUTH-Env zur Build-Zeit
+// Abschalten mit `?devauth=off`.
 //
 // Liegt getrennt von DevFakeAuth.tsx, damit jene Datei nur Komponenten
 // exportiert (react-refresh/only-export-components). Existiert, weil wir den
 // echten Entra-Tenant gerade nicht erreichen und die UI trotzdem in allen
-// Rollen-Zustaenden entwickeln / previewen wollen.
+// Rollen-Zuständen entwickeln / vorab ansehen wollen.
 
 export const STORAGE_KEY = "dev_auth_role";
 export const VALID_ROLES = ["admin", "teacher", "student"] as const;

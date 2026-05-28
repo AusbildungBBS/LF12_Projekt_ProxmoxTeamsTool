@@ -1,7 +1,7 @@
 # ── Lokaler Full-Stack (Frontend + Bridge auf einem Host) ────────────────────
 # Setzt die beiden Tier-Dateien zu EINEM Compose-Projekt zusammen — praktisch
-# fuer lokale Entwicklung / Single-Host-Tests. Der Cloudflare-Tunnel bleibt hier
-# aus (er haengt am `tunnel`-Profil in docker-compose.backend.yml).
+# für lokale Entwicklung / Single-Host-Tests. Der Cloudflare-Tunnel bleibt hier
+# aus (er hängt am `tunnel`-Profil in docker-compose.backend.yml).
 #
 #   docker compose up --build            # Frontend (:8080) + Bridge, ohne Tunnel
 #
@@ -20,7 +20,7 @@
 #   b) Oder einen Reverse-Proxy davorsetzen, der /api + /ws auf die Bridge routet
 #      (dann API_BASE_URL leer lassen, BRIDGE_BIND ggf. anpassen).
 #
-# Benoetigt Docker Compose v2.20+ (fuer das `include:`-Element).
+# Benötigt Docker Compose v2.20+ (für das `include:`-Element).
 include:
   - docker-compose.backend.yml
   - docker-compose.frontend.yml

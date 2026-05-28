@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 // Fehler-Karte. Rendert nichts, wenn weder message noch children gesetzt sind —
-// der `{error && ...}`-Guard beim Caller entfaellt damit. `prefix` ist per
-// Default "Fehler: " (auf "" setzen fuer bereits formatierte Meldungen).
+// der `{error && ...}`-Guard beim Aufrufer entfällt damit. `prefix` ist per
+// Default "Fehler: " (auf "" setzen für bereits formatierte Meldungen).
 export function ErrorCard({
   message,
   prefix = "Fehler: ",

@@ -2,7 +2,7 @@
 set -e
 # Schreibt die Laufzeit-Config der SPA nach /config.js — aus Environment-Vars
 # ODER, falls <NAME>_FILE gesetzt ist, aus der Datei (Compose-/Docker-Secrets).
-# Laeuft beim Container-Start (nginx fuehrt /docker-entrypoint.d/*.sh aus).
+# Läuft beim Container-Start (nginx führt /docker-entrypoint.d/*.sh aus).
 
 val() {
   eval "v=\${$1:-}"

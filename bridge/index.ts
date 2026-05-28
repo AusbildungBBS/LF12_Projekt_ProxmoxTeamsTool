@@ -31,14 +31,14 @@ dotenv.config();
 
 const PORT = process.env.PORT || 3001;
 // Config-Werte via envOrFile(): Env-Var <NAME> ODER Datei aus <NAME>_FILE
-// (Docker-/Compose-Secrets). Beide Wege werden unterstuetzt.
+// (Docker-/Compose-Secrets). Beide Wege werden unterstützt.
 const TENANT_ID = envOrFile("AZURE_TENANT_ID") || envOrFile("VITE_AZURE_TENANT_ID");
 const CLIENT_ID = envOrFile("AZURE_CLIENT_ID") || envOrFile("VITE_AZURE_CLIENT_ID");
 const CLIENT_SECRET = envOrFile("AZURE_CLIENT_SECRET");
 const API_AUDIENCE = envOrFile("API_AUDIENCE");
 
-// AUTH_MODE: standard | edu | auto (default). Controls how the bridge derives
-// roles + classes for a user. See docs/entra-setup.md → "Tenant-Typ wählen".
+// AUTH_MODE: standard | edu | auto (default). Steuert, wie die Bridge die
+// Rollen + Klassen eines Users ableitet. Siehe docs/entra-setup.md → "Tenant-Typ wählen".
 const AUTH_MODE = (process.env.AUTH_MODE ?? "auto").toLowerCase() as
   | "standard"
   | "edu"
@@ -52,7 +52,7 @@ const PROXMOX_TLS_INSECURE =
   (process.env.PROXMOX_TLS_REJECT_UNAUTHORIZED ?? "true").toLowerCase() ===
   "false";
 
-// Proxmox client (null if env not configured — bridge then skips class filter).
+// Proxmox client (null, wenn die Env nicht konfiguriert ist — die Bridge überspringt dann den Klassen-Filter).
 const proxmox = createProxmoxClientFromEnv();
 if (proxmox) {
   console.log("[bridge] Proxmox client configured: " + PROXMOX_URL);
@@ -69,7 +69,7 @@ if (!TENANT_ID || !CLIENT_ID) {
 }
 
 // Der Tenant IST das Schloss: mit einer Multi-Tenant-Authority würden Tokens aus
-// JEDEM Entra-Tenant die Issuer-Pruefung passieren und die Org-Grenze verschwindet.
+// JEDEM Entra-Tenant die Issuer-Prüfung passieren und die Org-Grenze verschwindet.
 // Darum harter Boot-Abbruch, wenn TENANT_ID ein Multi-Tenant-Platzhalter ist.
 const MULTI_TENANT_AUTHORITIES = new Set(["common", "organizations", "consumers"]);
 if (MULTI_TENANT_AUTHORITIES.has(TENANT_ID.toLowerCase())) {
@@ -81,11 +81,11 @@ if (MULTI_TENANT_AUTHORITIES.has(TENANT_ID.toLowerCase())) {
 }
 
 // CORS: leer => offen (Dev / Single-Host hinter Reverse-Proxy, same-origin).
-// Gesetzt (Komma-separierte Origin-Liste) => nur diese Origins duerfen die
-// Bridge cross-origin aufrufen — noetig, sobald das Frontend auf einer anderen
+// Gesetzt (Komma-separierte Origin-Liste) => nur diese Origins dürfen die
+// Bridge cross-origin aufrufen — nötig, sobald das Frontend auf einer anderen
 // Origin liegt (z.B. Azure Static Web Apps) und die Bridge per Cloudflare-Tunnel
-// erreicht wird. Auth laeuft per Bearer-Header (keine Cookies) -> kein
-// credentials:true noetig.
+// erreicht wird. Auth läuft per Bearer-Header (keine Cookies) -> kein
+// credentials:true nötig.
 const CORS_ALLOWED_ORIGINS = (envOrFile("CORS_ALLOWED_ORIGINS") ?? "")
   .split(",")
   .map((o) => o.trim())
@@ -106,7 +106,7 @@ app.use(
 );
 app.use(express.json());
 
-// Getypter Auth-Fehler, damit die Middleware einen aussagekraeftigen Status/Code
+// Getypter Auth-Fehler, damit die Middleware einen aussagekräftigen Status/Code
 // liefern kann, statt jeden Fehlschlag auf "Invalid token" / 500 zu kollabieren.
 class AuthError extends Error {
   constructor(
@@ -119,7 +119,7 @@ class AuthError extends Error {
   }
 }
 
-// ── JWKS / Token Validation ────────────────────────────────────────────────────
+// ── JWKS / Token-Validierung ────────────────────────────────────────────────────
 
 const jwks = jwksClient({
   jwksUri: `https://login.microsoftonline.com/${TENANT_ID}/discovery/v2.0/keys`,
@@ -155,10 +155,10 @@ export interface BridgeClaims extends JwtPayload {
 
 function verifyToken(token: string): Promise<BridgeClaims> {
   return new Promise((resolve, reject) => {
-    // v1 tokens carry `aud: api://<client-id>`, v2 tokens carry `aud: <client-id>`.
-    // Accept both so the bridge works regardless of the App Registration's
-    // `requestedAccessTokenVersion` setting. Override with API_AUDIENCE if a
-    // custom Application ID URI is configured in Entra.
+    // v1-Tokens tragen `aud: api://<client-id>`, v2-Tokens tragen `aud: <client-id>`.
+    // Beide werden akzeptiert, damit die Bridge unabhängig von der Einstellung
+    // `requestedAccessTokenVersion` der App Registration funktioniert. Mit API_AUDIENCE
+    // überschreibbar, falls in Entra eine eigene Application ID URI konfiguriert ist.
     const audience: [string, ...string[]] | undefined = API_AUDIENCE
       ? [API_AUDIENCE]
       : CLIENT_ID
@@ -180,8 +180,8 @@ function verifyToken(token: string): Promise<BridgeClaims> {
         }
         const claims = decoded as BridgeClaims;
         // Defense-in-depth: `issuer` oben pinnt den Tenant bereits, aber wir
-        // pruefen den `tid`-Claim zusaetzlich explizit, damit ein Config-Drift
-        // niemals stillschweigend ein org-fremdes Token durchlaesst.
+        // prüfen den `tid`-Claim zusätzlich explizit, damit ein Config-Drift
+        // niemals stillschweigend ein org-fremdes Token durchlässt.
         if (claims.tid !== TENANT_ID) {
           reject(
             new AuthError(403, "wrong_tenant", "Token was issued for a different tenant")
@@ -194,7 +194,7 @@ function verifyToken(token: string): Promise<BridgeClaims> {
   });
 }
 
-// ── Auth Middleware ────────────────────────────────────────────────────────────
+// ── Auth-Middleware ────────────────────────────────────────────────────────────
 
 declare module "express-serve-static-core" {
   interface Request {
@@ -225,7 +225,7 @@ async function requireAuth(
     console.error("[bridge] token validation failed:", err);
     // Unterscheidbarer Status/Code statt pauschalem 401, damit ein org-fremder /
     // abgelaufener / falsch-adressierter Aufrufer (und unsere Support-Logs) die
-    // Faelle auseinanderhalten kann. Die Bridge ist single-tenant (Boot-Guard).
+    // Fälle auseinanderhalten kann. Die Bridge ist single-tenant (Boot-Guard).
     if (err instanceof AuthError) {
       res.status(err.status).json({ error: err.message, code: err.code });
       return;
@@ -244,13 +244,13 @@ async function requireAuth(
   }
 }
 
-// ── Group Membership Resolution ────────────────────────────────────────────────
+// ── Auflösung der Gruppen-Mitgliedschaften ────────────────────────────────────────────────
 
 const GROUP_CACHE_TTL_MS = 10 * 60 * 1000;
 const groupCache = new Map<string, { groups: string[]; expiresAt: number }>();
 
-// Overage: when a user is in >150 groups Entra drops the `groups` array and
-// sets `_claim_names.groups` instead — then we have to fetch via Graph.
+// Overage: Ist ein User in >150 Gruppen, lässt Entra das `groups`-Array weg und
+// setzt stattdessen `_claim_names.groups` — dann müssen wir per Graph nachladen.
 async function getUserGroups(
   claims: BridgeClaims,
   graphToken: string
@@ -279,7 +279,7 @@ async function getUserGroups(
   return groups;
 }
 
-// ── On-Behalf-Of Helper ────────────────────────────────────────────────────────
+// ── On-Behalf-Of-Helfer ────────────────────────────────────────────────────────
 
 async function exchangeForGraphToken(userToken: string): Promise<string> {
   if (!CLIENT_ID || !CLIENT_SECRET) {
@@ -302,7 +302,7 @@ async function exchangeForGraphToken(userToken: string): Promise<string> {
   return response.data.access_token;
 }
 
-// ── Identity Resolver (standard / edu / auto) ──────────────────────────────────
+// ── Identity-Auflösung (standard / edu / auto) ──────────────────────────────────
 
 const MODE_CACHE_TTL_MS = 60 * 60 * 1000;
 const modeCache = new Map<string, { mode: "standard" | "edu"; expiresAt: number }>();
@@ -323,8 +323,8 @@ async function detectMode(
     });
     mode = "edu";
   } catch (e) {
-    // 403/404 → tenant lacks EDU or user has no EDU profile → standard path.
-    // Any other error is propagated so we don't silently mis-classify.
+    // 403/404 → Tenant hat kein EDU oder der User hat kein EDU-Profil → Standard-Pfad.
+    // Jeder andere Fehler wird durchgereicht, damit wir nicht stillschweigend falsch klassifizieren.
     if (axios.isAxiosError(e) && (e.response?.status === 403 || e.response?.status === 404)) {
       mode = "standard";
     } else {
@@ -370,9 +370,9 @@ async function resolveFromStandard(
   };
 }
 
-// EDU path — untested without an EDU tenant. Built against Microsoft Graph
-// Education docs. When an EDU tenant becomes available, verify primaryRole values
-// and the $expand=group response shape.
+// EDU-Pfad — ungetestet ohne EDU-Tenant. Anhand der Microsoft-Graph-Education-Doku
+// gebaut. Sobald ein EDU-Tenant verfügbar ist, die primaryRole-Werte und die
+// Form der $expand=group-Response verifizieren.
 async function resolveFromEdu(
   claims: BridgeClaims,
   graphToken: string
@@ -386,8 +386,8 @@ async function resolveFromEdu(
   const rawClasses = await getRawClassOids("edu", claims, graphToken);
   const classes = await filterToActiveClasses(proxmox, rawClasses);
 
-  // Admin role is never in EDU's primaryRole — it stays an explicit App Role.
-  // Union of EDU-derived + explicit App Roles from the token.
+  // Die Admin-Rolle steckt nie in der primaryRole von EDU — sie bleibt eine explizite App Role.
+  // Vereinigung aus EDU-abgeleiteten + expliziten App Roles aus dem Token.
   const explicitAppRoles = filterAppRoles(claims.roles);
   const roles = Array.from(new Set([...eduRoles, ...explicitAppRoles]));
 
@@ -412,13 +412,13 @@ async function resolveIdentity(
     : resolveFromStandard(claims, graphToken);
 }
 
-// ── Identity Middleware + Authorization Helpers ────────────────────────────────
+// ── Identity-Middleware + Autorisierungs-Helfer ────────────────────────────────
 
 // Klassifiziert einen Fehler aus dem Identity-/Upstream-Pfad nach Quelle
-// (Microsoft-IdP vs. Proxmox — resolveIdentity ruft fuer die Klassen-Whitelist
+// (Microsoft-IdP vs. Proxmox — resolveIdentity ruft für die Klassen-Whitelist
 // auch Proxmox auf!) und reicht die echte Ursache durch, statt pauschal den IdP
 // zu beschuldigen. Auth-Header/-URLs werden NICHT exponiert (nur Code/Message/
-// Upstream-Status/-Body); das rohe `detail` nur ausserhalb von production.
+// Upstream-Status/-Body); das rohe `detail` nur außerhalb von production.
 function describeUpstreamError(err: unknown): {
   status: number;
   code: string;
@@ -514,8 +514,8 @@ async function requireIdentity(
 }
 
 // Dev-Impersonation: nur in non-prod und nur wenn der echte Anrufer Admin ist.
-// Erlaubt einen einzelnen App-Role-Header, der die Rolle fuer diese Request
-// ueberschreibt -- praktisch fuer Demo-Screenshots.
+// Erlaubt einen einzelnen App-Role-Header, der die Rolle für diese Request
+// überschreibt -- praktisch für Demo-Screenshots.
 function maybeImpersonate(
   real: BridgeIdentity,
   req: express.Request
@@ -527,7 +527,7 @@ function maybeImpersonate(
   );
 }
 
-// ── Routes ─────────────────────────────────────────────────────────────────────
+// ── Routen ─────────────────────────────────────────────────────────────────────
 
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok", timestamp: new Date().toISOString() });
@@ -722,9 +722,9 @@ async function resolveClassDisplayNames(
   );
 }
 
-// Alle Klassen, die der Lehrer einem Template zuweisen koennte -- das sind
+// Alle Klassen, die der Lehrer einem Template zuweisen könnte -- das sind
 // seine eigenen M365-Group-Memberships (ohne den Active-Filter), denn ein
-// Lehrer kann *seine* Klassen aktivieren, indem er ein Template hin haengt.
+// Lehrer kann *seine* Klassen aktivieren, indem er ein Template hin hängt.
 app.get("/api/classes/assignable", requireAuth, requireIdentity, async (req, res) => {
   if (!isTeacher(req.identity!) && !isAdmin(req.identity!)) {
     res.status(403).json({ error: "Nur Lehrer/Admin" });
@@ -764,7 +764,7 @@ async function patchTemplateTags(
   return { ...tpl, tags: newTags };
 }
 
-// Lehrer/Admin uebernehmen ein noch ungeclaimtes Template -- setzt tpl-owner-<self>.
+// Lehrer/Admin übernehmen ein noch ungeclaimtes Template -- setzt tpl-owner-<self>.
 app.post("/api/templates/:vmid/claim", requireAuth, requireIdentity, async (req, res) => {
   if (!requireProxmox(res)) return;
   if (!isTeacher(req.identity!) && !isAdmin(req.identity!)) {
@@ -884,8 +884,8 @@ async function buildVmDTOsWithAvg(
   vms: VM[],
   templatesByVmid: Map<number, VM>
 ) {
-  // RRD-Calls fuer running VMs parallelisieren. Der Cache (30 s) faengt
-  // Auto-Refresh-Bursts ab, sodass nicht jeder Request 10 RRD-Calls schiesst.
+  // RRD-Calls für running VMs parallelisieren. Der Cache (30 s) fängt
+  // Auto-Refresh-Bursts ab, sodass nicht jeder Request 10 RRD-Calls schießt.
   return Promise.all(
     vms.map(async (v) => {
       if (v.status !== "running") return vmDTO(v, templatesByVmid);
@@ -909,9 +909,9 @@ app.get("/api/vms", requireAuth, requireIdentity, async (req, res) => {
   }
 });
 
-// Console-Link auf die Proxmox-WebUI-noVNC-Console. WICHTIG: das oeffnet die
-// Proxmox-UI direkt, die per Cookie-Auth laeuft -- der User muss dort einmal
-// einloggen. Fuer eine schulreife Loesung muesste die Bridge die VNC-Session
+// Console-Link auf die Proxmox-WebUI-noVNC-Console. WICHTIG: das öffnet die
+// Proxmox-UI direkt, die per Cookie-Auth läuft -- der User muss dort einmal
+// einloggen. Für eine schulreife Lösung müsste die Bridge die VNC-Session
 // proxy'en, das ist ein eigener Brocken Arbeit.
 app.get("/api/vms/:vmid/console-link", requireAuth, requireIdentity, async (req, res) => {
   if (!requireProxmox(res)) return;
@@ -936,7 +936,7 @@ app.get("/api/vms/:vmid/console-link", requireAuth, requireIdentity, async (req,
     res.json({
       url,
       hint:
-        "Oeffnet die Proxmox-WebUI-Console in einem neuen Tab. Erstanmeldung mit Proxmox-Credentials (z.B. root@pam) noetig -- die Auth-Cookie-Session laeuft separat von Entra.",
+        "Öffnet die Proxmox-WebUI-Konsole in einem neuen Tab. Erstanmeldung mit Proxmox-Credentials (z.B. root@pam) nötig — die Auth-Cookie-Session läuft separat von Entra.",
     });
   } catch (err) {
     proxmoxErrorResponse(res, err);
@@ -987,17 +987,17 @@ app.post("/api/vms/from-template/:templateId", requireAuth, requireIdentity, asy
       name: safeName,
       full: true,
     });
-    // Tag-Finalize im Hintergrund: clone uebernimmt die Template-Tags
+    // Tag-Finalize im Hintergrund: clone übernimmt die Template-Tags
     // (`pttool-tpl;tpl-class-...;tpl-owner-...`), wir brauchen aber das
     // VM-Schema (`pttool;vm-owner-<oid>;vm-tpl-<tplid>`). Polling, weil
-    // updateConfig waehrend des Clone-Tasks mit "VM is locked" failt.
+    // updateConfig während des Clone-Tasks mit "VM is locked" failt.
     finalizeClonedVmTags(tpl.node, nextId, tpl.vmid, id.oid).catch((e) =>
       console.error("[bridge] finalizeClonedVmTags failed:", e)
     );
     res.status(202).json({
       task,
       newVmid: nextId,
-      note: "Clone task enqueued. Tags werden im Hintergrund umgeschrieben.",
+      note: "Klon-Vorgang eingereiht. Tags werden im Hintergrund umgeschrieben.",
     });
   } catch (err) {
     proxmoxErrorResponse(res, err);
@@ -1033,7 +1033,7 @@ async function finalizeClonedVmTags(
 }
 
 async function pickFreeVmid(): Promise<VMID> {
-  // Proxmox /cluster/nextid liefert den naechsten freien.
+  // Proxmox /cluster/nextid liefert den nächsten freien.
   // Aber listVMs reicht uns — wir nehmen max+1.
   const all = await proxmox!.listVMs();
   if (all.length === 0) return 100;
@@ -1058,8 +1058,8 @@ app.delete("/api/vms/:vmid", requireAuth, requireIdentity, async (req, res) => {
   await vmAction(req, res, "delete");
 });
 
-// Disk anhaengen. Admin/Lehrer (canModify) duerfen Disks an alle VMs in
-// ihrem Sichtbereich attachen; Schueler an ihre eigene VM.
+// Disk anhängen. Admin/Lehrer (canModify) dürfen Disks an alle VMs in
+// ihrem Sichtbereich attachen; Schüler an ihre eigene VM.
 app.post("/api/vms/:vmid/disk", requireAuth, requireIdentity, async (req, res) => {
   if (!requireProxmox(res)) return;
   try {
@@ -1146,8 +1146,8 @@ function proxmoxErrorResponse(res: express.Response, err: unknown) {
   }
 }
 
-// Debug endpoints — only registered outside production. Dockerfile sets
-// NODE_ENV=production for shipped builds, so they're auto-gated.
+// Debug-Endpoints — werden nur außerhalb von production registriert. Das Dockerfile
+// setzt NODE_ENV=production für ausgelieferte Builds, daher sind sie automatisch abgeriegelt.
 if (process.env.NODE_ENV !== "production") {
   app.get("/api/debug/proxmox", requireAuth, async (_req, res) => {
     if (!proxmox) {
@@ -1253,14 +1253,14 @@ if (process.env.NODE_ENV !== "production") {
 }
 
 // ── VNC-Websocket-Proxy ────────────────────────────────────────────────────────
-// Flow:
+// Ablauf:
 //  1. Frontend ruft POST /api/vms/:vmid/vnc-session  -> Bridge ruft vncproxy auf
 //     Proxmox auf, kriegt ticket+port, speichert in vncSessions-Map mit
 //     einmalig nutzbarem session-key. Returns: { sessionKey, password: ticket }
-//  2. Frontend oeffnet WS auf /ws/vnc/:vmid?session=KEY
-//  3. Bridge schlaegt session-key in Map nach (single-use, delete on read),
-//     oeffnet upstream-WS zum Proxmox-vncwebsocket-Endpoint mit dem ticket
-//     im Query + API-Token im Authorization-Header, tunnels Binary-Frames.
+//  2. Frontend öffnet WS auf /ws/vnc/:vmid?session=KEY
+//  3. Bridge schlägt session-key in Map nach (single-use, delete on read),
+//     öffnet upstream-WS zum Proxmox-vncwebsocket-Endpoint mit dem ticket
+//     im Query + API-Token im Authorization-Header, tunnelt Binary-Frames.
 //  4. noVNC im Frontend nutzt den ticket als RFB-Password -- Proxmox-VNC
 //     macht VncAuth gegen genau diesen ticket-string.
 
@@ -1276,7 +1276,7 @@ interface VncSession {
 const vncSessions = new Map<string, VncSession>();
 
 function generateSessionKey(): string {
-  // 32 hex chars — collision-resistant for a 60s in-memory map.
+  // 32 Hex-Zeichen — kollisionssicher für eine 60s-In-Memory-Map.
   return randomBytes(16).toString("hex");
 }
 
@@ -1416,7 +1416,7 @@ async function proxyVncSession(clientWs: WebSocket, session: VncSession): Promis
   });
 }
 
-// Periodische TTL-Aufraeumung, damit verfallene Sessions nicht im Speicher hocken.
+// Periodische TTL-Aufräumung, damit verfallene Sessions nicht im Speicher hocken.
 setInterval(() => {
   const now = Date.now();
   for (const [k, v] of vncSessions) if (v.expiresAt < now) vncSessions.delete(k);

@@ -1,7 +1,7 @@
 {
   "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.20/MicrosoftTeams.schema.json",
   "manifestVersion": "1.20",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "id": "{{AZURE_CLIENT_ID}}",
   "developer": {
     "name": "LF12 Projekt Team",
@@ -11,11 +11,11 @@
   },
   "name": {
     "short": "Proxmox Teams Tool",
-    "full": "Proxmox Management Tool for Microsoft Teams"
+    "full": "Proxmox-Verwaltung für Microsoft Teams"
   },
   "description": {
-    "short": "Manage Proxmox VE from Microsoft Teams",
-    "full": "Microsoft-Teams-Tab fuer das Verwalten von Proxmox-VMs aus Templates. Lehrer weisen Templates Klassen zu, Schueler erstellen daraus eigene VMs und steuern sie (Start/Stop/Console)."
+    "short": "Proxmox VE direkt aus Microsoft Teams verwalten",
+    "full": "Microsoft-Teams-Tab zum Verwalten von Proxmox-VMs aus Vorlagen. Lehrer weisen Vorlagen Klassen zu, Schüler erstellen daraus eigene VMs und steuern sie (Start, Stopp, Konsole)."
   },
   "icons": {
     "outline": "outline.png",
@@ -32,7 +32,7 @@
     },
     {
       "entityId": "templates",
-      "name": "Templates",
+      "name": "Vorlagen",
       "contentUrl": "https://{{FRONTEND_HOST}}/templates",
       "websiteUrl": "https://{{FRONTEND_HOST}}/templates",
       "scopes": ["personal"]

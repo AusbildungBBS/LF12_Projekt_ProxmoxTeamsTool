@@ -10,8 +10,8 @@ function vmWithTags(tags: string[]): VM {
   return { node: "pve", vmid: 1, name: "x", status: "stopped", template: false, tags };
 }
 
-// Minimaler Fake — classes.ts nutzt nur listVMs(). Zaehlt die Aufrufe, um das
-// Caching zu pruefen.
+// Minimaler Fake — classes.ts nutzt nur listVMs(). Zählt die Aufrufe, um das
+// Caching zu prüfen.
 function fakeClient(vms: VM[]) {
   let calls = 0;
   const client = {
@@ -33,13 +33,13 @@ describe("classes", () => {
       expect(await getActiveClassOids(null)).toBeNull();
     });
 
-    it("filterToActiveClasses laesst alle Kandidaten durch", async () => {
+    it("filterToActiveClasses lässt alle Kandidaten durch", async () => {
       expect(await filterToActiveClasses(null, ["a", "b"])).toEqual(["a", "b"]);
     });
   });
 
   describe("mit Proxmox-Client", () => {
-    it("sammelt die OIDs aus tpl-class-Tags ueber alle VMs", async () => {
+    it("sammelt die OIDs aus tpl-class-Tags über alle VMs", async () => {
       const { client } = fakeClient([
         vmWithTags(["pttool-tpl", "tpl-class-math", "tpl-class-physics"]),
         vmWithTags(["pttool-tpl", "tpl-class-math"]),
@@ -52,7 +52,7 @@ describe("classes", () => {
 
     it("filtert Kandidaten auf aktive Klassen (Whitelist)", async () => {
       const { client } = fakeClient([vmWithTags(["tpl-class-math"])]);
-      // 'all-company' ist eine M365-Group ohne tpl-class-Tag -> faellt raus.
+      // 'all-company' ist eine M365-Group ohne tpl-class-Tag -> fällt raus.
       expect(await filterToActiveClasses(client, ["math", "all-company"])).toEqual([
         "math",
       ]);

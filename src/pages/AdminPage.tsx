@@ -54,7 +54,7 @@ export function AdminPage() {
   if (!isAdmin) {
     return (
       <section className="page">
-        <p>Diese Seite ist nur fuer Admins.</p>
+        <p>Diese Seite ist nur für Admins.</p>
       </section>
     );
   }
@@ -62,22 +62,22 @@ export function AdminPage() {
   return (
     <section className="page">
       <header className="page-header">
-        <h2>Admin Console</h2>
-        <p className="page-subtitle">Globale Sicht ueber alle Templates, VMs und Klassen.</p>
+        <h2>Admin-Konsole</h2>
+        <p className="page-subtitle">Globale Sicht über alle Vorlagen, VMs und Klassen.</p>
       </header>
 
       <ErrorCard message={error} />
 
       <div className="admin-grid">
         <div className="card">
-          <h3>Templates ({templates?.length ?? "—"})</h3>
+          <h3>Vorlagen ({templates?.length ?? "—"})</h3>
           <ul>
             {templates?.map((t) => (
               <li key={t.vmid}>
                 <strong>{t.name}</strong> (VMID {t.vmid})
-                {t.isPublic && <span className="badge badge-public">public</span>}
+                {t.isPublic && <span className="badge badge-public">öffentlich</span>}
                 <br />
-                <small>{t.classes.length} Klassen, Owner {shortOid(t.ownerOid)}</small>
+                <small>{t.classes.length} Klassen, Besitzer {shortOid(t.ownerOid)}</small>
               </li>
             ))}
           </ul>
@@ -96,7 +96,7 @@ export function AdminPage() {
                 {v.status === "running" && (
                   <Link
                     to={`/vms/${v.vmid}/console`}
-                    title="Console"
+                    title="Konsole"
                     className="inline-icon-link"
                   >
                     🖥
@@ -104,7 +104,7 @@ export function AdminPage() {
                 )}
                 <br />
                 <small>
-                  Owner {shortOid(v.ownerOid)} · aus Template{" "}
+                  Besitzer {shortOid(v.ownerOid)} · aus Vorlage{" "}
                   {v.sourceTemplate
                     ? v.sourceTemplate.name ?? `VMID ${v.sourceTemplate.vmid}`
                     : "—"}

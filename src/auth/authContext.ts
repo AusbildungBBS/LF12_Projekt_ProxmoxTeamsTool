@@ -7,7 +7,7 @@ import type { ImpersonatedRole } from "./roles";
 export type { ImpersonatedRole };
 
 // Context, Hook + Typen leben hier (nicht in TeamsAuthProvider.tsx), damit die
-// Provider-Datei ausschliesslich Komponenten exportiert — Voraussetzung dafuer,
+// Provider-Datei ausschließlich Komponenten exportiert — Voraussetzung dafür,
 // dass React Fast Refresh / HMR sauber funktioniert
 // (react-refresh/only-export-components).
 
@@ -29,7 +29,7 @@ export interface BridgeIdentity {
   source: "standard" | "edu";
 }
 
-// Normalisierte Auth-Session: EIN Identitaets-Objekt, egal ob der Login via
+// Normalisierte Auth-Session: EIN Identitäts-Objekt, egal ob der Login via
 // MSAL (Browser) oder Teams-SSO (Tab) kam. Der Provider baut es aus den
 // jeweiligen Claims; die Bridge-Identity (oben) ist autoritativ und reichert es
 // an. Bewusst minimal — nur was die UI auch OHNE Bridge braucht.
@@ -62,8 +62,8 @@ export interface AuthContextType {
   loading: boolean;
   error: string | null;
   // Demo-Impersonation: ein echter Admin kann eine andere Rolle "aufsetzen".
-  // realIsAdmin gibt zurueck, ob der angemeldete User WIRKLICH Admin ist
-  // (unabhaengig von der Impersonation), damit das Switcher-UI nur fuer
+  // realIsAdmin gibt zurück, ob der angemeldete Benutzer WIRKLICH Admin ist
+  // (unabhängig von der Impersonation), damit das Switcher-UI nur für
   // echte Admins angezeigt wird.
   realIsAdmin: boolean;
   impersonatedRole: ImpersonatedRole | null;

@@ -1,7 +1,7 @@
-// Domain types for talking to Proxmox VE.
+// Domänentypen für die Kommunikation mit Proxmox VE.
 //
-// Tags are plain comma-separated strings on the Proxmox side. We model them
-// as a string[] here and the client implementation handles the join/split.
+// Tags sind auf der Proxmox-Seite einfache, kommagetrennte Strings. Wir bilden sie
+// hier als string[] ab und die Client-Implementierung übernimmt das join/split.
 
 export type VMID = number;
 
@@ -19,7 +19,7 @@ export interface VM extends VMRef {
   tags: string[];
   cpus?: number;
   maxmem?: number;
-  // Live-Stats aus cluster/resources — nur fuer running VMs sinnvoll.
+  // Live-Stats aus cluster/resources — nur für running VMs sinnvoll.
   cpu?: number;       // Auslastung 0..1 (1.0 == alle vCPUs voll)
   mem?: number;       // belegter Arbeitsspeicher in Bytes
   uptime?: number;    // Sekunden seit Start
@@ -45,8 +45,8 @@ export interface CloneOptions {
   full?: boolean;
 }
 
-// Proxmox task identifier (UPID). Async operations return one of these; the
-// caller can poll getTask() to learn when it's done.
+// Proxmox-Task-Bezeichner (UPID). Asynchrone Operationen geben einen solchen zurück;
+// der Aufrufer kann getTask() abfragen, um zu erfahren, wann die Operation fertig ist.
 export interface TaskRef {
   node: string;
   upid: string;

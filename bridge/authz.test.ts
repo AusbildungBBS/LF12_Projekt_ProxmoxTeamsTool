@@ -47,11 +47,11 @@ const NO_ROLE = identity([]);
 // ── Role helpers ─────────────────────────────────────────────────────────────
 
 describe("filterAppRoles", () => {
-  it("liefert [] fuer undefined", () => {
+  it("liefert [] für undefined", () => {
     expect(filterAppRoles(undefined)).toEqual([]);
   });
 
-  it("behaelt nur bekannte Proxmox-Rollen, verwirft Fremdes", () => {
+  it("behält nur bekannte Proxmox-Rollen, verwirft Fremdes", () => {
     expect(
       filterAppRoles(["Proxmox.Admin", "Directory.Read", "Proxmox.Student", "junk"])
     ).toEqual(["Proxmox.Admin", "Proxmox.Student"]);
@@ -72,7 +72,7 @@ describe("mapEduRoleToAppRoles", () => {
     expect(mapEduRoleToAppRoles("student")).toEqual(["Proxmox.Student"]);
   });
 
-  it("liefert [] fuer unbekannt/undefined (Admin kommt nie aus EDU)", () => {
+  it("liefert [] für unbekannt/undefined (Admin kommt nie aus EDU)", () => {
     expect(mapEduRoleToAppRoles(undefined)).toEqual([]);
     expect(mapEduRoleToAppRoles("admin")).toEqual([]);
     expect(mapEduRoleToAppRoles("principal")).toEqual([]);
@@ -108,12 +108,12 @@ describe("applyImpersonation", () => {
     expect(applyImpersonation(teacher, "Proxmox.Student", false)).toBe(teacher);
   });
 
-  it("Admin setzt eine gueltige Rolle auf (ersetzt die Rollen-Liste)", () => {
+  it("Admin setzt eine gültige Rolle auf (ersetzt die Rollen-Liste)", () => {
     const res = applyImpersonation(ADMIN, "Proxmox.Teacher", false);
     expect(res.roles).toEqual(["Proxmox.Teacher"]);
   });
 
-  it("ignoriert eine ungueltige Wunschrolle", () => {
+  it("ignoriert eine ungültige Wunschrolle", () => {
     expect(applyImpersonation(ADMIN, "Proxmox.SuperUser", false)).toBe(ADMIN);
   });
 
@@ -152,7 +152,7 @@ describe("canSeeTemplate", () => {
     it("sieht eigene Templates", () => {
       expect(canSeeTemplate(ownTpl, teacher)).toBe(true);
     });
-    it("sieht oeffentliche fremde Templates", () => {
+    it("sieht öffentliche fremde Templates", () => {
       expect(canSeeTemplate(foreignPublic, teacher)).toBe(true);
     });
     it("sieht fremde Templates, die einer seiner Klassen zugewiesen sind", () => {
@@ -167,12 +167,12 @@ describe("canSeeTemplate", () => {
     });
   });
 
-  describe("Schueler", () => {
+  describe("Schüler", () => {
     it("sieht nur Templates seiner Klasse(n)", () => {
       const student = identity(["Proxmox.Student"], { classes: ["math"] });
       expect(canSeeTemplate(classTpl, student)).toBe(true);
     });
-    it("sieht weder ungeclaimte noch public Templates ausserhalb seiner Klasse", () => {
+    it("sieht weder ungeclaimte noch public Templates außerhalb seiner Klasse", () => {
       const student = identity(["Proxmox.Student"], { classes: ["math"] });
       expect(canSeeTemplate(unclaimed, student)).toBe(false);
       expect(canSeeTemplate(foreignPublic, student)).toBe(false);
@@ -196,21 +196,21 @@ describe("canSeeVm / canModifyVm", () => {
   const vmNoSource = vm(["pttool", "vm-owner-student-1"], { vmid: 103 });
 
   describe("Admin", () => {
-    it("sieht und aendert jede VM", () => {
+    it("sieht und ändert jede VM", () => {
       expect(canSeeVm(otherStudentsVm, ADMIN, templates)).toBe(true);
       expect(canModifyVm(otherStudentsVm, ADMIN, templates)).toBe(true);
     });
   });
 
-  describe("Schueler", () => {
+  describe("Schüler", () => {
     const student = identity(["Proxmox.Student"], { oid: "student-1", classes: ["math"] });
 
-    it("sieht/aendert nur die eigene VM (owner == self)", () => {
+    it("sieht/ändert nur die eigene VM (owner == self)", () => {
       expect(canSeeVm(myVm, student, templates)).toBe(true);
       expect(canModifyVm(myVm, student, templates)).toBe(true);
     });
 
-    it("kann die VM eines ANDEREN Schuelers nicht sehen/aendern", () => {
+    it("kann die VM eines ANDEREN Schülers nicht sehen/ändern", () => {
       expect(canSeeVm(otherStudentsVm, student, templates)).toBe(false);
       expect(canModifyVm(otherStudentsVm, student, templates)).toBe(false);
     });
@@ -219,7 +219,7 @@ describe("canSeeVm / canModifyVm", () => {
   describe("Lehrer", () => {
     const teacher = identity(["Proxmox.Teacher"], { oid: "teacher-1", classes: ["math"] });
 
-    it("sieht/aendert VMs, deren Quell-Template in seiner Klasse ist", () => {
+    it("sieht/ändert VMs, deren Quell-Template in seiner Klasse ist", () => {
       expect(canSeeVm(myVm, teacher, templates)).toBe(true);
       expect(canModifyVm(otherStudentsVm, teacher, templates)).toBe(true);
     });
@@ -239,7 +239,7 @@ describe("canSeeVm / canModifyVm", () => {
   });
 
   describe("ohne Rolle", () => {
-    it("sieht/aendert nichts", () => {
+    it("sieht/ändert nichts", () => {
       expect(canSeeVm(myVm, NO_ROLE, templates)).toBe(false);
       expect(canModifyVm(myVm, NO_ROLE, templates)).toBe(false);
     });

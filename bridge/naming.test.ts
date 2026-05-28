@@ -8,7 +8,7 @@ describe("buildVmName", () => {
     );
   });
 
-  it("ersetzt Zeichen ausserhalb [a-z0-9-] durch '-'", () => {
+  it("ersetzt Zeichen außerhalb [a-z0-9-] durch '-'", () => {
     expect(buildVmName("j_smith@contoso.com", 100, 105)).toBe("j-smith-tpl100-105");
     expect(buildVmName("a+b@x", 1, 2)).toBe("a-b-tpl1-2");
   });
@@ -23,7 +23,7 @@ describe("buildVmName", () => {
     );
   });
 
-  it("kuerzt hart auf 60 Zeichen", () => {
+  it("kürzt hart auf 60 Zeichen", () => {
     const longLocal = "a".repeat(80);
     const name = buildVmName(`${longLocal}@x.de`, 1, 1);
     expect(name.length).toBe(60);

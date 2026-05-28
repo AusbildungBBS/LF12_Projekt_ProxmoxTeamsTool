@@ -18,7 +18,7 @@ export function UserProfile() {
   } = useAuth();
 
   if (loading) {
-    return <div className="profile-bar loading">Authenticating...</div>;
+    return <div className="profile-bar loading">Authentifizierung läuft ...</div>;
   }
 
   if (!isAuthenticated) {
@@ -27,14 +27,14 @@ export function UserProfile() {
         <img src="/logo.svg" alt="Proxmox Teams Tool" className="welcome-mark" />
         <h2>Willkommen beim Proxmox Teams Tool</h2>
         {isInTeams ? (
-          // In Teams uebernimmt Teams-SSO den Login (kein MSAL-Redirect-Button,
-          // der im iFrame ohnehin scheitern wuerde). Dieser Zweig greift nur,
+          // In Teams übernimmt Teams-SSO den Login (kein MSAL-Redirect-Button,
+          // der im iFrame ohnehin scheitern würde). Dieser Zweig greift nur,
           // wenn das stille SSO (noch) kein Token geliefert hat.
           <p>Anmeldung über Microsoft Teams …</p>
         ) : (
           <p>
             Melde dich mit deinem Microsoft-Account an, um auf deine VMs und
-            Templates zuzugreifen.
+            Vorlagen zuzugreifen.
           </p>
         )}
         {error && <p className="error">{error}</p>}
@@ -47,7 +47,7 @@ export function UserProfile() {
     );
   }
 
-  const displayName = profile?.displayName || user?.name || "Unknown User";
+  const displayName = profile?.displayName || user?.name || "Unbekannter Benutzer";
   const email =
     profile?.mail || profile?.userPrincipalName || user?.username || "";
 
@@ -55,8 +55,8 @@ export function UserProfile() {
     <div
       className="profile-bar"
       title={
-        `Tenant: ${user?.tenantId ?? "N/A"} · Environment: ${
-          isInTeams ? "Microsoft Teams" : "Browser (Standalone)"
+        `Mandant: ${user?.tenantId ?? "N/A"} · Umgebung: ${
+          isInTeams ? "Microsoft Teams" : "Browser (eigenständig)"
         }`
       }
     >
@@ -75,11 +75,11 @@ export function UserProfile() {
             </span>
           ))
         )}
-        {impersonatedRole && <span className="badge badge-impersonate">impersonating</span>}
+        {impersonatedRole && <span className="badge badge-impersonate">Ansicht gewechselt</span>}
       </div>
       {realIsAdmin && (
         <label className="impersonate-select" title="Demo: andere Rolle aufsetzen">
-          View as:
+          Ansicht als:
           <select
             value={impersonatedRole ?? ROLES.ADMIN}
             onChange={(e) => {
@@ -89,14 +89,14 @@ export function UserProfile() {
           >
             <option value={ROLES.ADMIN}>Admin (echt)</option>
             <option value={ROLES.TEACHER}>Lehrer</option>
-            <option value={ROLES.STUDENT}>Schueler</option>
+            <option value={ROLES.STUDENT}>Schüler</option>
           </select>
         </label>
       )}
       {!isInTeams && (
-        // In Teams kommt Logout/Identitaet aus dem Teams-Client selbst.
+        // In Teams kommt Logout/Identität aus dem Teams-Client selbst.
         <button onClick={logout} className="btn btn-sm">
-          Sign out
+          Abmelden
         </button>
       )}
     </div>

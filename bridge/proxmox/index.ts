@@ -21,8 +21,8 @@ import { RealProxmoxClient } from "./RealProxmoxClient";
 import type { ProxmoxClient } from "./client";
 import { envOrFile } from "../env";
 
-// Factory — returns a ProxmoxClient if the env is fully configured, or null
-// (in which case the bridge falls back to not filtering classes server-side).
+// Factory — gibt einen ProxmoxClient zurück, wenn die Env vollständig konfiguriert ist, sonst null
+// (in diesem Fall verzichtet die Bridge serverseitig auf das Filtern von Klassen).
 export function createProxmoxClientFromEnv(): ProxmoxClient | null {
   const baseUrl = envOrFile("PROXMOX_URL");
   const tokenId = envOrFile("PROXMOX_TOKEN_ID");

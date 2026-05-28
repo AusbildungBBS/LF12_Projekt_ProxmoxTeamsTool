@@ -18,6 +18,21 @@ import { errMsg } from "../lib/errors";
 
 type BulkAction = "start" | "shutdown" | "stop" | "delete";
 
+const BULK_ACTION_LABELS: Record<BulkAction, { verb: string; label: string }> = {
+  start: { verb: "gestartet werden", label: "Start" },
+  shutdown: { verb: "heruntergefahren werden", label: "Herunterfahren" },
+  stop: { verb: "hart gestoppt werden", label: "Stopp" },
+  delete: { verb: "gelöscht werden", label: "Löschen" },
+};
+
+function visibilityLabel(visibility: string): string {
+  const labels: Record<string, string> = {
+    public: "öffentlich",
+    private: "privat",
+  };
+  return labels[visibility.toLowerCase()] ?? visibility;
+}
+
 export function ClassesPage() {
   const { isAuthenticated, accessToken } = useAuth();
   const { isStaff } = useRoleFlags();
@@ -53,14 +68,14 @@ export function ClassesPage() {
     })();
   }, [accessToken, refresh]);
 
-  // Auto-Refresh fuer Live-Stats wenn was laeuft.
+  // Auto-Refresh für Live-Stats wenn was läuft.
   useVmAutoRefresh(vms, refresh);
 
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
   if (!isStaff) {
     return (
       <section className="page">
-        <p>Diese Seite ist nur fuer Lehrer und Admins.</p>
+        <p>Diese Seite ist nur für Lehrer und Admins.</p>
       </section>
     );
   }
@@ -83,7 +98,7 @@ export function ClassesPage() {
     }
     if (
       action === "delete" &&
-      !confirm(`${targetVms.length} VM(s) in dieser Klasse wirklich loeschen?`)
+      !confirm(`${targetVms.length} VM(s) in dieser Klasse wirklich löschen?`)
     )
       return;
     if (
@@ -107,11 +122,11 @@ export function ClassesPage() {
     const failed = results.filter((r) => r.status === "rejected");
     if (failed.length > 0) {
       setError(
-        `${failed.length} von ${targetVms.length} VMs konnten nicht ${action}: ` +
+        `${failed.length} von ${targetVms.length} VMs konnten nicht ${BULK_ACTION_LABELS[action].verb}: ` +
           (failed[0] as PromiseRejectedResult).reason
       );
     } else {
-      setHint(`${targetVms.length} VM(s): "${action}" ausgeloest.`);
+      setHint(`${targetVms.length} VM(s): "${BULK_ACTION_LABELS[action].label}" ausgelöst.`);
     }
     setBusy(null);
     await refresh();
@@ -122,8 +137,8 @@ export function ClassesPage() {
       <header className="page-header">
         <h2>Klassen</h2>
         <p className="page-subtitle">
-          Aktive Klassen verwalten — Templates der Klasse, VMs der Klasse und
-          Sammel-Aktionen (Start / Shutdown / Stop / Loeschen).
+          Aktive Klassen verwalten — Vorlagen der Klasse, VMs der Klasse und
+          Sammel-Aktionen (Start / Herunterfahren / Stopp / Löschen).
         </p>
       </header>
 
@@ -134,8 +149,8 @@ export function ClassesPage() {
       {classes && classes.length === 0 && (
         <EmptyCard>
           <p>
-            Du bist in keiner aktiven Klasse fuer dieses Tool. Sobald ein
-            Template einer deiner Klassen-Groups zugewiesen wird, taucht sie
+            Du bist in keiner aktiven Klasse für dieses Tool. Sobald ein
+            Vorlage einer deiner Klassen-Gruppen zugewiesen wird, taucht sie
             hier auf.
           </p>
         </EmptyCard>
@@ -151,13 +166,13 @@ export function ClassesPage() {
               <li key={c.oid} className="card">
                 <div className="card-row">
                   <strong>{c.displayName ?? "(unbekannt)"}</strong>
-                  {c.visibility && <span className="badge">{c.visibility}</span>}
+                  {c.visibility && <span className="badge">{visibilityLabel(c.visibility)}</span>}
                   <span className="badge">
-                    {tpls.length} Template{tpls.length === 1 ? "" : "s"}
+                    {tpls.length} Vorlage{tpls.length === 1 ? "" : "n"}
                   </span>
                   <span className="badge">
                     {cvms.length} VM{cvms.length === 1 ? "" : "s"}
-                    {runningCount > 0 ? ` · ${runningCount} running` : ""}
+                    {runningCount > 0 ? ` · ${runningCount} läuft` : ""}
                   </span>
                 </div>
                 <div className="card-meta">
@@ -167,7 +182,7 @@ export function ClassesPage() {
 
                 {tpls.length > 0 && (
                   <div className="card-edit">
-                    <h4>Templates dieser Klasse</h4>
+                    <h4>Vorlagen dieser Klasse</h4>
                     <ul className="inline-list">
                       {tpls.map((t) => (
                         <li key={t.vmid}>
@@ -176,7 +191,7 @@ export function ClassesPage() {
                           </Link>
                           <span className="muted"> (VMID {t.vmid})</span>
                           {t.isPublic && (
-                            <span className="badge badge-public">public</span>
+                            <span className="badge badge-public">öffentlich</span>
                           )}
                         </li>
                       ))}
@@ -197,9 +212,9 @@ export function ClassesPage() {
                           {v.status === "running" && (
                             <Link
                               to={`/vms/${v.vmid}/console`}
-                              title="Console oeffnen"
+                              title="Konsole öffnen"
                               className="inline-icon-link"
-                              aria-label="Console oeffnen"
+                              aria-label="Konsole öffnen"
                             >
                               🖥
                             </Link>
@@ -224,8 +239,8 @@ export function ClassesPage() {
                       <button
                         className="icon-button"
                         data-tooltip="Alle sauber herunterfahren"
-                        title="Alle Shutdown"
-                        aria-label="Alle Shutdown"
+                        title="Alle herunterfahren"
+                        aria-label="Alle herunterfahren"
                         disabled={
                           busy === `${c.oid}:shutdown` || runningCount === 0
                         }
@@ -236,8 +251,8 @@ export function ClassesPage() {
                       <button
                         className="icon-button"
                         data-tooltip="Alle hart stoppen"
-                        title="Alle Stop (hart)"
-                        aria-label="Alle Stop"
+                        title="Alle hart stoppen"
+                        aria-label="Alle hart stoppen"
                         disabled={
                           busy === `${c.oid}:stop` || runningCount === 0
                         }
@@ -247,9 +262,9 @@ export function ClassesPage() {
                       </button>
                       <button
                         className="icon-button danger"
-                        data-tooltip="Alle loeschen"
-                        title="Alle loeschen"
-                        aria-label="Alle loeschen"
+                        data-tooltip="Alle löschen"
+                        title="Alle löschen"
+                        aria-label="Alle löschen"
                         disabled={busy === `${c.oid}:delete`}
                         onClick={() => bulk(c.oid, "delete")}
                       >

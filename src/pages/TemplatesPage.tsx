@@ -64,7 +64,7 @@ export function TemplatesPage() {
     await withBusy(t.vmid, async () => {
       const res = await api.createVmFromTemplate(t.vmid);
       setHint(
-        `Klon-Task fuer VMID ${res.newVmid} an Proxmox uebergeben (UPID ${res.task.upid}).`
+        `Klon-Aufgabe für VMID ${res.newVmid} an Proxmox übergeben (UPID ${res.task.upid}).`
       );
     });
   }
@@ -77,7 +77,7 @@ export function TemplatesPage() {
   }
 
   async function release(t: Template) {
-    if (!confirm(`Template "${t.name}" freigeben? Es wird wieder claimbar.`)) return;
+    if (!confirm(`Vorlage "${t.name}" freigeben? Sie kann danach wieder übernommen werden.`)) return;
     await withBusy(t.vmid, async () => {
       await api.releaseTemplate(t.vmid);
       await refresh();
@@ -104,26 +104,26 @@ export function TemplatesPage() {
   return (
     <section className="page">
       <header className="page-header">
-        <h2>Templates</h2>
+        <h2>Vorlagen</h2>
         <p className="page-subtitle">
           {isStudent
-            ? "Templates, die dir ueber deine Klasse(n) zugewiesen wurden."
-            : "Templates verwalten — Owner, Public-Flag, Klassen-Zuweisung."}
+            ? "Vorlagen, die dir über deine Klasse(n) zugewiesen wurden."
+            : "Vorlagen verwalten — Besitzer, öffentliche Freigabe und Klassen-Zuweisung."}
         </p>
       </header>
 
       <ErrorCard message={error} />
       {hint && <div className="card hint">{hint}</div>}
 
-      {templates === null && <LoadingCard label="Lade Templates ..." />}
+      {templates === null && <LoadingCard label="Lade Vorlagen ..." />}
 
       {templates && templates.length === 0 && (
         <EmptyCard>
           <p>
-            Keine Templates in deinem Sichtbereich.{" "}
+            Keine Vorlagen in deinem Sichtbereich.{" "}
             {isStudent
-              ? "Sobald ein Lehrer ein Template fuer deine Klasse freigibt, taucht es hier auf."
-              : "Lege ein Template in Proxmox an und tag es mit pttool-tpl."}
+              ? "Sobald ein Lehrer eine Vorlage für deine Klasse freigibt, taucht sie hier auf."
+              : "Lege eine Vorlage in Proxmox an und markiere sie mit pttool-tpl."}
           </p>
         </EmptyCard>
       )}
@@ -131,13 +131,13 @@ export function TemplatesPage() {
       {templates && templates.length > 0 && (
         <ul className="card-list">
           {templates.map((t) => {
-            // "isOwn" nur, wenn der User auch managen darf -- sonst zeigen
-            // wir einem Schueler, der zufaellig die gleiche OID wie der Owner
+            // "isOwn" nur, wenn der Benutzer auch verwalten darf -- sonst zeigen
+            // wir einem Schüler, der zufällig die gleiche OID wie der Besitzer
             // hat (oder in Impersonation-Demos), keine Edit-Buttons.
             const isOwn = !!t.ownerOid && identity?.oid === t.ownerOid && canManage;
-            // Edit-Buttons (Public / Classes / Release) brauchen einen Owner,
-            // sonst gibt's nichts zu freizugeben und Public/Classes-Setzen waere
-            // ein verkappter Claim. Solange ungeclaimt, ist die einzige
+            // Edit-Buttons (öffentlich / Klassen / Freigeben) brauchen einen Besitzer,
+            // sonst gibt's nichts freizugeben und Freigaben/Klassen-Setzen wäre
+            // eine verdeckte Übernahme. Solange nicht zugewiesen, ist die einzige
             // sinnvolle Aktion "Mir zuweisen".
             const canEdit = !!t.ownerOid && (isAdmin || isOwn);
             const editing = editingId === t.vmid;
@@ -147,31 +147,31 @@ export function TemplatesPage() {
                   <strong>{t.name}</strong>
                   <span className="badge">VMID {t.vmid}</span>
                   {t.isPublic && (
-                    <span className="badge badge-public">public</span>
+                    <span className="badge badge-public">öffentlich</span>
                   )}
                   {!t.ownerOid && (
-                    <span className="badge badge-unclaimed">ungeclaimt</span>
+                    <span className="badge badge-unclaimed">nicht zugewiesen</span>
                   )}
-                  {isOwn && <span className="badge badge-own">dein Template</span>}
+                  {isOwn && <span className="badge badge-own">deine Vorlage</span>}
                 </div>
                 <div className="card-meta">
                   <span>Klassen: {t.classes.length}</span>
-                  <span>Node: {t.node}</span>
+                  <span>Knoten: {t.node}</span>
                   {t.ownerOid && !isOwn && (
-                    <span>Owner: {shortOid(t.ownerOid)}…</span>
+                    <span>Besitzer: {shortOid(t.ownerOid)}…</span>
                   )}
                 </div>
 
                 <div className="card-actions icon-actions">
                   <button
                     className="icon-button"
-                    aria-label="VM aus diesem Template erstellen"
+                    aria-label="VM aus dieser Vorlage erstellen"
                     data-tooltip={
                       isStudent
-                        ? "VM aus diesem Template erstellen (max. eine pro Template)"
-                        : "VM aus diesem Template erstellen (Test/Demo)"
+                        ? "VM aus dieser Vorlage erstellen (max. eine pro Vorlage)"
+                        : "VM aus dieser Vorlage erstellen (Test/Demo)"
                     }
-                    title="VM aus diesem Template erstellen"
+                    title="VM aus dieser Vorlage erstellen"
                     onClick={() => instantiate(t)}
                     disabled={busyId === t.vmid}
                   >
@@ -182,7 +182,7 @@ export function TemplatesPage() {
                     <button
                       className="icon-button wide"
                       aria-label="Mir zuweisen"
-                      data-tooltip="Mir zuweisen (Owner werden)"
+                      data-tooltip="Mir zuweisen (Besitzer werden)"
                       title="Mir zuweisen"
                       onClick={() => claim(t)}
                       disabled={busyId === t.vmid}
@@ -195,9 +195,9 @@ export function TemplatesPage() {
                     <>
                       <button
                         className={`icon-button ${t.isPublic ? "active" : ""}`}
-                        aria-label="Public toggeln"
-                        data-tooltip={t.isPublic ? "Public-Flag entfernen" : "Public machen"}
-                        title="Public-Flag"
+                        aria-label="Öffentliche Freigabe umschalten"
+                        data-tooltip={t.isPublic ? "Öffentliche Freigabe entfernen" : "Öffentlich freigeben"}
+                        title="Öffentliche Freigabe"
                         onClick={() => togglePublic(t)}
                         disabled={busyId === t.vmid}
                       >
@@ -216,7 +216,7 @@ export function TemplatesPage() {
                       <button
                         className="icon-button"
                         aria-label="Freigeben"
-                        data-tooltip="Freigeben (kein Owner mehr)"
+                        data-tooltip="Freigeben (kein Besitzer mehr)"
                         title="Freigeben"
                         onClick={() => release(t)}
                         disabled={busyId === t.vmid}
@@ -230,10 +230,10 @@ export function TemplatesPage() {
                 {canEdit && editing && (
                   <div className="card-edit">
                     <h4>Klassen-Zuweisung</h4>
-                    {assignable === null && <p>Lade Klassen...</p>}
+                    {assignable === null && <p>Lade Klassen ...</p>}
                     {assignable && assignable.length === 0 && (
                       <p className="muted">
-                        Du bist in keiner M365-Group, die du als Klasse zuweisen koenntest.
+                        Du bist in keiner M365-Gruppe, die du als Klasse zuweisen könntest.
                       </p>
                     )}
                     {assignable && assignable.length > 0 && (

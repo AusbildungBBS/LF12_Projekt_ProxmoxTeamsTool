@@ -1,14 +1,14 @@
 import { Link } from "react-router-dom";
 
-// Catch-all fuer nicht existierende Routen — sonst landet eine Falsch-URL in
-// einer leeren App-Huelle (Header ohne Inhalt).
+// Catch-all für nicht existierende Routen — sonst landet eine Falsch-URL in
+// einer leeren App-Hülle (Header ohne Inhalt).
 export function NotFoundPage() {
   return (
     <section className="page">
       <header className="page-header">
         <h2>404 — Seite nicht gefunden</h2>
         <p className="page-subtitle">
-          Diese Seite gibt es nicht (oder sie läuft auf einer anderen VM 😉).
+          Diese Seite gibt es nicht oder sie läuft auf einer anderen VM.
         </p>
       </header>
       <div className="card">
