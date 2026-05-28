@@ -159,7 +159,8 @@ AZURE_CLIENT_SECRET=<secret-value-aus-schritt-6>
 - **`AADSTS65001` / Consent-Prompt taucht jedesmal auf:** Schritt 5 (Admin Consent) fehlt.
 - **Bridge `401 Invalid token` mit `jwt issuer invalid` im Bridge-Log:** Schritt 2a (Token-Version auf v2) fehlt — Token kommt als v1 raus.
 - **`roles`-Claim fehlt:** User ist der App nicht zugewiesen (Schritt 3, Enterprise Applications).
-- **`groups`-Claim fehlt oder hat „overage":** Schritt 4, Format ist „Groups assigned to the application", nicht „All".
+- **`groups`-Claim fehlt komplett:** „Add groups claim" wurde nie konfiguriert — Schritt 4 nachholen (Token configuration → Add groups claim, **„All groups"**, Format **Group ID**). Nicht „Groups assigned to the application" wählen — das setzt laut Schritt 4 Azure AD P1 voraus.
+- **`groups`-Claim zeigt „overage" (`_claim_names` statt Array):** Kein Handlungsbedarf — bei >150 Memberships normal und wird von der Bridge automatisch per Graph `POST /me/getMemberGroups` nachgeladen (siehe Schritt 4 „Overage-Fallback" und [bridge/index.ts → `getUserGroups`](../bridge/index.ts)).
 - **Bridge startet nicht, Log `FATAL: AZURE_TENANT_ID … required` bzw. `… is a multi-tenant authority`:** `AZURE_TENANT_ID` fehlt oder ist `common`/`organizations`/`consumers` — die Bridge erzwingt Single-Tenant. Konkrete Directory-(Tenant-)GUID eintragen.
 - **Bridge `403` mit `code: wrong_tenant`:** Token stammt aus einem anderen Tenant als `AZURE_TENANT_ID`.
 - **Bridge `403` mit `code: not_provisioned`:** Token ist gültig + im richtigen Tenant, aber der OBO-/Graph-Call scheitert (kein Admin-Consent, externer Gast, nicht zugewiesen) — siehe Schritt 5/6.

@@ -39,7 +39,7 @@ write_files:
       # SSH-Hostkeys nachziehen, falls beim Templating entfernt (eindeutig pro Klon)
       ls /etc/ssh/ssh_host_*_key >/dev/null 2>&1 || { ssh-keygen -A; systemctl restart ssh 2>/dev/null || true; }
 
-      # Erst-Boot: 10-stelliges Zahlen-Passwort fÃ¼r root erzeugen + persistieren
+      # Erst-Boot: 10-stelliges Zahlen-Passwort für root erzeugen + persistieren
       if [ ! -f "$CRED" ]; then
         PW="$(tr -dc 0-9 </dev/urandom | head -c 10)"
         echo "root:$PW" | chpasswd
@@ -64,7 +64,7 @@ write_files:
         echo "       ssh ${LOGIN}@${IP}"
         echo "       Passwort:  ${PASS}"
         echo
-        echo "   (nach erstem Login Ã¤ndern:  passwd)"
+        echo "   (nach erstem Login ändern:  passwd)"
         echo "=========================================================="
         echo
       } > /etc/issue
@@ -113,7 +113,7 @@ cd /tmp
 wget -O debian12.qcow2 \
   https://cloud.debian.org/images/cloud/bookworm/latest/debian-12-genericcloud-amd64.qcow2
 
-VMID=9000   # freie VMID wÃ¤hlen
+VMID=9000   # freie VMID wählen
 
 qm create $VMID --name debian12-lab --memory 2048 --cores 2 \
   --net0 virtio,bridge=vmbr0 --scsihw virtio-scsi-pci
@@ -122,12 +122,12 @@ qm set $VMID --scsi0 local-lvm:vm-$VMID-disk-0
 qm set $VMID --ide2 local-lvm:cloudinit
 qm set $VMID --boot order=scsi0
 qm set $VMID --vga std                                   # VGA -> Banner im noVNC sichtbar
-qm set $VMID --serial0 socket                            # Serial-Konsole zusÃ¤tzlich (genericcloud)
+qm set $VMID --serial0 socket                            # Serial-Konsole zusätzlich (genericcloud)
 qm set $VMID --ipconfig0 ip=dhcp                         # DHCP
 qm set $VMID --cicustom "user=local:snippets/lab-userdata.yaml"
 qm set $VMID --tags pttool-tpl                           # Tag, damit das Proxmox-Teams-Tool es findet
 
-# (optional) Disk vergrÃ¶Ãern, das Cloud-Image ist klein:
+# (optional) Disk vergrößern, das Cloud-Image ist klein:
 qm disk resize $VMID scsi0 +8G
 
 qm template $VMID
@@ -151,7 +151,7 @@ Dann im Proxmox-Webinterface **VM 123 → Console** öffnen. Nach dem Boot steht
        ssh root@10.x.x.x
        Passwort:  1234567890
 
-   (nach erstem Login Ã¤ndern:  passwd)
+   (nach erstem Login ändern:  passwd)
 ==========================================================
 ```
 

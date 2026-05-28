@@ -97,7 +97,7 @@ gitignored, das Manifest-Template bleibt versioniert.
    Static-Tab (Dashboard) oeffnet sich
 
 Du hast jetzt drei Tabs im App-Header: **Proxmox** (Dashboard),
-**Templates**, **Meine VMs**. Pin links in der Sidebar, dann ist die
+**Vorlagen**, **Meine VMs**. Pin links in der Sidebar, dann ist die
 App in jeder Teams-Session direkt da.
 
 ## Troubleshooting

@@ -19,7 +19,7 @@ Damit der Login durchgeht, müssen vorher die Entra-Schritte gemacht sein (Schri
 
 ## 1. Voraussetzungen
 
-- **Node ≥ 20** (Vite 8 + TypeScript 6).
+- **Node ≥ 20** (Vite 8 + TypeScript 6; CI und Docker-Images nutzen Node 22).
 - **npm** (`package-lock.json` ist eingecheckt — bitte kein pnpm/yarn-Mix).
 - **Git**.
 - *Optional, für Proxmox-Anbindung:* Windows mit Hyper-V (macOS reicht nicht für die Dev-Proxmox-VM) — Details in [proxmox-dev-setup.md](proxmox-dev-setup.md).

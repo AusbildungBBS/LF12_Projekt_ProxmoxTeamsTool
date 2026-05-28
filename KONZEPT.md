@@ -1,6 +1,6 @@
 # Konzept — Proxmox Teams Tool
 
-> Stand: 2026-05-21 — frühe Konzeptphase. Repo enthält aktuell nur ein Teams-SSO-Gerüst (React + Express OBO). Das hier beschreibt die geplante Zielarchitektur.
+> Stand: 2026-05-28 — beschreibt die Zielarchitektur des Tools, die inzwischen umgesetzt ist (Bridge mit JWT-Validierung gegen Entra, Identity-/Klassen-Auflösung, Proxmox-Client, alle Endpunkte, VNC-WebSocket-Proxy). Den konkreten Umsetzungsstand führt das [README → „Umsetzungsstand"](README.md#umsetzungsstand).
 
 ## Idee in einem Satz
 
@@ -39,7 +39,7 @@ Ein Microsoft-Teams-Tab, mit dem Lehrer Schülern Proxmox-VMs aus Templates zur 
 - Zwei externe Abhängigkeiten:
   - **Proxmox-API** für die eigentlichen Operationen.
   - **Microsoft Entra/Graph** für Token-Validierung und ggf. Gruppen­mit­glied­schaft.
-- Hält möglichst **keinen State** (siehe Tags unten). Caching optional, später.
+- Hält **keinen persistenten State** (keine DB; Proxmox-Tags bleiben Single Source of Truth, siehe Tags unten). Nur kurzlebige In-Memory-Caches (Identity-Modus, Group-Memberships, Klassen-Whitelist, Stats) — Details unter [Performance](#performance).
 
 ### 3. Proxmox
 - Source of Truth für VMs, Templates **und deren Metadaten** (Owner, Klasse, Public-Flag) — alles in Proxmox-Tags.
@@ -64,7 +64,7 @@ Ein Microsoft-Teams-Tab, mit dem Lehrer Schülern Proxmox-VMs aus Templates zur 
 
 ## Datenmodell — alles in Proxmox-Tags
 
-Proxmox-Tags sind plain strings ohne Key/Value. Konvention: `prefix:value`.
+Proxmox-Tags sind plain strings ohne Key/Value. Konvention: `prefix-value` (Proxmox VE 8 erlaubt in Tags nur `[a-z0-9_-]`, daher `-` statt `:`).
 
 ### VM-Tags
 | Tag | Bedeutung |
@@ -111,7 +111,7 @@ Der VM-Name wird beim Klonen aus einem Template **serverseitig in der Bridge** d
 | `alice.meier@school.de` | 9000 | 142 | `alice-meier-tpl9000-142` |
 | `j_smith@contoso.com` | 100 | 105 | `j-smith-tpl100-105` |
 
-**Source of Truth:** [`bridge/index.ts`](bridge/index.ts) (`safeName`-Erzeugung beim Clone) und `pickFreeVmid()` für die VMID-Vergabe. Es gibt **keinen Config-/Env-Key** für das Format — eine Formatänderung ist eine Code-Änderung.
+**Source of Truth:** [`bridge/naming.ts`](bridge/naming.ts) (`buildVmName()` für die Namens-Erzeugung beim Clone) und [`bridge/index.ts`](bridge/index.ts) (`pickFreeVmid()` für die VMID-Vergabe). Es gibt **keinen Config-/Env-Key** für das Format — eine Formatänderung ist eine Code-Änderung.
 
 > **Bewusst offen:** Das einzige Längenlimit ist der `slice(0, 60)`. Es gibt **keine** DNS-Label-Prüfung (63 Zeichen, kein führender/abschließender `-`, kein Doppel-`-`). Reicht für den aktuellen Use-Case; bei Bedarf später härten.
 
@@ -175,23 +175,18 @@ Pro eingehendem Request:
 
 ---
 
-## Performance — bewusst auf später vertagt
+## Performance
 
-- Erste Iteration: Tags pro Request live aus Proxmox lesen.
-- Wenn das ruckelt → in dieser Reihenfolge eskalieren:
-  1. In-Memory-Cache in der Bridge (Tags pro Resource, kurze TTL).
-  2. Batch-Reads (Proxmox liefert Listen mit Tags inklusive).
-  3. Dedizierter Endpoint / Sekundärindex in der Bridge.
-- **Nicht** vorab bauen.
+- **Stufe 1 umgesetzt:** kurzlebige In-Memory-Caches in der Bridge — Identity-Modus (1 h/OID), Group-Memberships im Overage-Fall (10 min/OID), Klassen-Whitelist aus `cluster/resources` (5 min), RRD-Stats (30 s); inkl. gezielter Invalidierung (`clearActiveClassCache()`) nach Klassen-Zuweisung. Implementiert in [`bridge/classes.ts`](bridge/classes.ts) und [`bridge/index.ts`](bridge/index.ts).
+- **Noch offen — erst nach Messung bauen:**
+  1. Batch-Reads (Proxmox liefert Listen mit Tags inklusive).
+  2. Dedizierter Endpoint / Sekundärindex in der Bridge.
+- **Nicht** vorab bauen — das gilt weiter für Stufe 2/3.
 
 ---
 
-## Was als nächstes ansteht
+## Umsetzungsstand
 
-1. Bridge-Skeleton (eigener Service oder erstmal der bestehende `server/` ausgebaut) mit JWT-Validierung gegen Entra.
-2. Tag-Schema festklopfen (siehe oben — Strings finalisieren).
-3. Erste Read-Operation: „Liste meine VMs" (Schüler-Sicht) — End-to-End: Frontend → Bridge → Proxmox → gefilterte Antwort.
-4. Template-Erstellung + Klassenzuweisung (Lehrer-Sicht).
-5. VM-Erstellung aus Template (Schüler-Sicht) inkl. „eine pro Template"-Constraint.
+Die ursprünglich hier als nächste Schritte geplanten Punkte sind umgesetzt: Bridge mit JWT-Validierung gegen Entra, finalisiertes Tag-Schema, „Liste meine VMs" (End-to-End), Template-Verwaltung + Klassenzuweisung (Lehrer-Sicht) und VM-Erstellung aus Template inkl. „eine pro Template"-Constraint (409 bei Wiederholung). Den detaillierten Stand führt das [README → „Umsetzungsstand"](README.md#umsetzungsstand).
 
-Bis dahin: das hier ist ein Konzeptpapier, kein Implementations­plan.
+Genuin offen: Der EDU-Pfad (`resolveFromEdu`) ist ohne EDU-Tenant ungetestet, und die Performance-Eskalationsstufen 2/3 (Batch-Reads, dedizierter Index) sind bewusst vertagt.

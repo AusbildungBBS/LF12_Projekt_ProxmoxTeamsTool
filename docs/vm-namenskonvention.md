@@ -23,13 +23,15 @@ Beim Klonen einer VM aus einem Template wird der Name **serverseitig determinist
 
 ## Sanitization
 
-Implementiert in [`bridge/index.ts`](./../bridge/index.ts) (ca. Zeile 918–921):
+Implementiert in der Hilfsfunktion `buildVmName` in [`bridge/naming.ts`](./../bridge/naming.ts); aufgerufen beim Clone in [`bridge/index.ts`](./../bridge/index.ts) (`const safeName = buildVmName(id.email, templateId, nextId)`):
 
 ```typescript
-const safeName = `${id.email.split("@")[0]}-tpl${templateId}-${nextId}`
-  .toLowerCase()
-  .replace(/[^a-z0-9-]/g, "-")
-  .slice(0, 60);
+export function buildVmName(email: string, templateId: number, vmid: number): string {
+  return `${email.split("@")[0]}-tpl${templateId}-${vmid}`
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, "-")
+    .slice(0, 60);
+}
 ```
 
 Reihenfolge der Normalisierung:
@@ -42,7 +44,7 @@ Reihenfolge der Normalisierung:
 
 ## VMID-Vergabe
 
-Implementiert in [`bridge/index.ts`](./../bridge/index.ts) (ca. Zeile 972–979):
+Implementiert in [`bridge/index.ts`](./../bridge/index.ts), Funktion `pickFreeVmid()`:
 
 ```typescript
 async function pickFreeVmid(): Promise<VMID> {
@@ -69,5 +71,6 @@ Das ist eine bewusste Entscheidung: reicht für den aktuellen Use-Case, bei Beda
 ## Referenzen
 
 - [`KONZEPT.md`](./../KONZEPT.md) — offizielle Konzept-Doku der Namenskonvention (Abschnitt VM-Naming)
-- [`bridge/index.ts`](./../bridge/index.ts) — `safeName`-Generierung & `pickFreeVmid()`
+- [`bridge/naming.ts`](./../bridge/naming.ts) — `buildVmName()` (Namens-Generierung)
+- [`bridge/index.ts`](./../bridge/index.ts) — `pickFreeVmid()` (VMID-Vergabe) & Clone-Aufruf
 - [`bridge/proxmox/types.ts`](./../bridge/proxmox/types.ts) — `CloneOptions`- und `VM`-Interfaces
