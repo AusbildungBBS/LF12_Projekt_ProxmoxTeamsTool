@@ -2,7 +2,7 @@
 
 Microsoft-Teams-Tab, mit dem Lehrer Schülern Proxmox-VE-VMs aus Templates zur Verfügung stellen. Drei Rollen (Admin / Lehrer / Schüler), Klassen kommen aus M365-Groups, alle Proxmox-Metadaten leben als Tags in Proxmox selbst.
 
-> **Status:** Funktionierender End-to-End-Flow vom Teams-Login über Bridge bis Proxmox. Auth zweischienig (Standard/EDU), Klassen-Filter über Proxmox-Tags, Templates-/VMs-/Klassen-Endpoints mit Rollen- und Klassen-Authz, Frontend rendert Live-Daten, **VNC-Console direkt im Browser** via Bridge-WebSocket-Proxy. Offen: Prod-Deployment via Tunnel, dedizierter Proxmox-User — siehe [Roadmap](#roadmap).
+> **Status:** Funktionierender End-to-End-Flow vom Teams-Login über Bridge bis Proxmox. Auth zweischienig (Standard/EDU), Klassen-Filter über Proxmox-Tags, Templates-/VMs-/Klassen-Endpoints mit Rollen- und Klassen-Authz, Frontend rendert Live-Daten, **VNC-Console direkt im Browser** via Bridge-WebSocket-Proxy. Produktivbetrieb ist als Azure-SWA-Frontend + Bridge hinter Cloudflare-Tunnel dokumentiert; offen bleiben nur die externen Tenant-/Cloudflare-/Proxmox-Werte der jeweiligen Installation.
 
 Mehr Details:
 - **Setup-Anleitung (Onboarding):** [docs/setup.md](docs/setup.md)
@@ -21,7 +21,7 @@ Mehr Details:
 | **Frontend** | React 19 + TypeScript + Vite. Läuft als Teams-Tab. |
 | **Bridge** ([bridge/](bridge/)) | Express-Backend im Proxmox-Netz, validiert Entra-JWTs, prüft Rollen + Klasse + Ownership, ruft die Proxmox-API. |
 | **Auth** | Teams SSO via `@microsoft/teams-js`, MSAL, On-Behalf-Of zu Microsoft Graph. |
-| **Proxmox-Anbindung** | `ProxmoxClient`-Interface in [bridge/proxmox/](bridge/proxmox/). Implementation folgt. |
+| **Proxmox-Anbindung** | `RealProxmoxClient` in [bridge/proxmox/](bridge/proxmox/) spricht die Proxmox-VE-API per API-Token an; Templates, VMs und Klassenfreigaben kommen aus Proxmox-Tags. |
 
 ---
 
@@ -121,13 +121,12 @@ Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-**Build**-Variab
 
 ---
 
-## Roadmap
+## Umsetzungsstand
 
-1. ~~**`RealProxmoxClient`**~~ — erledigt. HTTP-Wrapper mit API-Token-Auth gegen Proxmox VE 8, Klassen-Filter via `tpl-class-<oid>`-Tags.
-2. ~~**Erste Bridge-Endpoints**~~ — erledigt. `GET /api/templates`, `GET /api/vms`, `GET /api/classes`, `POST /api/vms/from-template/:id`, `POST /api/vms/:vmid/start|/stop`, `DELETE /api/vms/:vmid`. Authz pro Endpoint mit Rolle + Owner-/Klassen-Check.
-3. ~~**Frontend-Wiring**~~ — erledigt. Templates-, MyVMs-, Klassen- und Admin-Page lesen live aus den Bridge-Endpoints und rendern Karten + Action-Buttons.
-4. ~~**VM-Tagging beim Clone fertig**~~ — erledigt. Bridge feuert nach `cloneFromTemplate` einen Background-Task, der per Polling die Tags der neuen VM auf das VM-Schema umstellt (`pttool;vm-owner-<oid>;vm-tpl-<src>`).
-5. ~~**VNC-Console im Frontend**~~ — erledigt. noVNC im Browser, Bridge proxied den WebSocket gegen Proxmox `vncwebsocket`. Single-use Session-Key + VNC-Ticket via `POST /api/vms/:vmid/vnc-session`. Kein direkter Proxmox-Login im Browser.
-6. **Teams-Manifest aktualisieren** — auf die produktive Bridge-URL.
-7. **Cloudflare-Tunnel-Deployment** der Bridge im Schulnetz.
-8. **Dedizierter Proxmox-User** statt `root@pam` fuer die Bridge.
+- **Proxmox-Client:** erledigt. HTTP-Wrapper mit API-Token-Auth gegen Proxmox VE 8, Klassen-Filter via `tpl-class-<oid>`-Tags.
+- **Bridge-Endpunkte:** erledigt. Templates, VMs, Klassen, VM-Aktionen und VNC-Session-Keys laufen mit Rollen-, Owner- und Klassen-Checks.
+- **Frontend-Wiring:** erledigt. Templates-, MyVMs-, Klassen- und Admin-Page lesen live aus den Bridge-Endpunkten.
+- **VM-Tagging beim Clone:** erledigt. Neue VMs werden nach dem Clone per Background-Task auf das VM-Tag-Schema umgestellt (`pttool;vm-owner-<oid>;vm-tpl-<src>`).
+- **VNC-Console:** erledigt. noVNC im Browser, Bridge-WebSocket-Proxy gegen Proxmox `vncwebsocket`, kein direkter Proxmox-Login im Browser.
+- **Deployment:** vorbereitet. Frontend per Azure Static Web Apps, Bridge per Docker Compose hinter Cloudflare-Tunnel; Details in [docs/deployment.md](docs/deployment.md).
+- **Betrieb:** für Produktivinstallationen einen dedizierten Proxmox-User mit minimalen Rechten verwenden, Secrets möglichst als Dateien/Compose-Secrets einbinden und `cloudflared` auf ein datiertes Image-Tag pinnen.

@@ -106,17 +106,14 @@ Die **API-URL** (`https://api.example.org`) ist ab jetzt der Wert für `VITE_API
 
 ## 4. Frontend auf Azure Static Web Apps
 
-SWA-Ressource anlegen (Portal → *Static Web Apps → Create*, Plan **Free**), als Quelle das GitHub-Repo wählen. Build-Settings:
-
-| Feld | Wert |
-|---|---|
-| App location | `/` |
-| Output location | `dist` |
-| API location | *(leer)* |
+SWA-Ressource anlegen (Portal → *Static Web Apps → Create*, Plan **Free**).
+Als Deployment-Quelle **Other/Manual** wählen, damit Azure keinen zweiten
+GitHub-Workflow ins Repo schreibt. Dieses Repo enthält bereits eine fertige
+Action, die mit dem SWA-Deployment-Token arbeitet.
 
 Das Frontend ruft die Bridge über `VITE_API_BASE_URL` auf, das **zur Build-Zeit** eingebacken wird (öffentlich, kein Secret). SPA-Routing kommt aus [public/staticwebapp.config.json](../public/staticwebapp.config.json) (Vite kopiert sie nach `dist/`).
 
-Diese Repo enthält eine fertige Action: [.github/workflows/azure-static-web-apps.yml](../.github/workflows/azure-static-web-apps.yml). Nötige GitHub-Konfiguration:
+Nötige GitHub-Konfiguration für [.github/workflows/azure-static-web-apps.yml](../.github/workflows/azure-static-web-apps.yml):
 
 - **Secret** `AZURE_STATIC_WEB_APPS_API_TOKEN` — der Deployment-Token aus der SWA-Ressource (*Overview → Manage deployment token*).
 - **Repository Variables** (Settings → Secrets and variables → Actions → *Variables*; öffentlich, daher Variables, nicht Secrets):
@@ -125,7 +122,7 @@ Diese Repo enthält eine fertige Action: [.github/workflows/azure-static-web-app
   - `VITE_AZURE_APP_ID_URI` = `api://<swa-host>/<client-id>` (optional, aber explizit sauber)
   - `VITE_API_BASE_URL` = `https://api.example.org` (aus Schritt 3)
 
-Push auf `main` → die Action baut (`npm ci && npm run build`) mit den `VITE_*`-Werten und deployt `dist/`. Der SWA-Hostname (`https://<name>.azurestaticapps.net`) steht danach im Portal.
+Push auf `main` oder manueller **Run workflow** → die Action baut (`npm ci && npm run build`) mit den `VITE_*`-Werten und deployt das fertige `dist/` (`skip_app_build: true`). Der SWA-Hostname (`https://<name>.azurestaticapps.net`) steht im Portal.
 
 > Eigene Domain: in SWA unter *Custom domains* hinterlegen. Dann diese Domain überall dort verwenden, wo unten `<swa-host>` steht.
 

@@ -1,8 +1,8 @@
 # Teams-App-Sideload (lokales Testen)
 
 Schnellster Weg, die App als nativen Teams-Tab zu installieren — ohne
-Org-weites Rollout. Reine Dev-/Demo-Variante; fuer Prod siehe Roadmap
-„Teams-Manifest aktualisieren + Cloudflare-Tunnel-Deployment".
+Org-weites Rollout. Reine Dev-/Demo-Variante; fuer Produktivbetrieb siehe
+[deployment.md](deployment.md).
 
 ## Was du brauchst
 
@@ -29,8 +29,9 @@ Falls Tailscale schon installiert (haben wir fuer Proxmox eh):
    Diese URL ist public-HTTPS mit Let's-Encrypt-Cert von Tailscale,
    kein Login noetig.
 
-Alternative: Cloudflare Tunnel (Service `cloudflared` unter dem `tunnel`-Profil
-in `docker-compose.backend.yml`). Mehr Setup, dafuer fuer Prod geeignet.
+Alternative: Cloudflare Tunnel fuer das Backend (Service `cloudflared` unter
+dem `tunnel`-Profil in `docker-compose.backend.yml`). Mehr Setup, dafuer fuer
+Prod geeignet; das Frontend laeuft dort in der Regel auf Azure Static Web Apps.
 
 ## Entra-App vorbereiten
 
@@ -115,8 +116,10 @@ App in jeder Teams-Session direkt da.
 
 ## Wenn du das fuer den Schul-Tenant deployen willst
 
-- Stabile Domain statt Tunnel — Cloudflare-Tunnel-Sidecar aktivieren:
-  `docker compose -f docker-compose.backend.yml --profile tunnel up -d`.
+- Produktivpfad nach [deployment.md](deployment.md): Frontend auf Azure Static
+  Web Apps, Bridge auf der Proxmox-VM hinter Cloudflare-Tunnel.
+- Stabile Domains verwenden: SWA-Host oder Custom Domain fuer das Frontend,
+  Cloudflare Public Hostname fuer die API.
 - Manifest-Version inkrementieren (jede Update-Variante braucht hoehere
   `version` in `manifest.json`).
 - Statt Sideload: Manifest in der Teams Admin Console org-weit

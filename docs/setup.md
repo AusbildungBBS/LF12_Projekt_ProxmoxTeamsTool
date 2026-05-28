@@ -73,7 +73,7 @@ AZURE_TENANT_ID=<directory-tenant-id>
 AZURE_CLIENT_SECRET=<secret-value>
 ```
 
-`PORT` (Bridge) nur überschreiben, wenn man bewusst von den Defaults abweicht. `API_AUDIENCE` ist nötig, sobald die Application ID URI hostbasiert ist. Die Proxmox-Variablen können leer bleiben, solange `RealProxmoxClient` noch nicht dran ist.
+`PORT` (Bridge) nur überschreiben, wenn man bewusst von den Defaults abweicht. `API_AUDIENCE` ist nötig, sobald die Application ID URI hostbasiert ist. Die Proxmox-Variablen können für UI-/Auth-Tests leer bleiben; echte VM-Aktionen brauchen eine erreichbare Proxmox-Instanz.
 
 > `.env` ist gitignored, `.env.example` wird gepflegt. Wenn du neue Variablen einführst, beides aktualisieren.
 
@@ -105,7 +105,7 @@ npm run dev:bridge
 2. Microsoft-Anmeldemaske durchklicken mit einem User, der in der App-Registration zugewiesen ist und einer der drei App-Roles trägt.
 3. Erfolg: man landet wieder auf `localhost:5173`, sieht die rollenabhängige UI (Admin/Lehrer/Schüler).
 4. Im Browser-DevTools-Network ist ein Access-Token sichtbar mit:
-   - `aud: api://<client-id>`
+   - `aud: <application-id-uri>` (lokal meist `api://<client-id>`, Teams/SWA `api://<frontend-host>/<client-id>`)
    - `roles: ["Proxmox.Teacher"]` (oder Admin/Student)
    - bei aktiviertem Groups-Claim: `groups: ["<group-oid>", …]`
 
