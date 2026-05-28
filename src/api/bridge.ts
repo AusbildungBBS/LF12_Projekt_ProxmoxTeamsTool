@@ -45,25 +45,41 @@ export interface TaskRef {
 }
 
 export function useBridgeApi() {
-  const { accessToken, impersonatedRole } = useAuth();
+  const { accessToken, impersonatedRole, getToken } = useAuth();
   return useMemo(() => {
-    const baseHeaders: Record<string, string> = accessToken
-      ? { Authorization: `Bearer ${accessToken}` }
-      : {};
-    if (impersonatedRole) {
-      baseHeaders["X-Impersonate-Role"] = impersonatedRole;
-    }
-
-    async function call<T>(url: string, init?: RequestInit): Promise<T> {
-      const headers: Record<string, string> = { ...baseHeaders };
+    function buildHeaders(
+      token: string | null,
+      init?: RequestInit
+    ): Record<string, string> {
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      if (impersonatedRole) headers["X-Impersonate-Role"] = impersonatedRole;
       if (init?.headers) {
         for (const [k, v] of Object.entries(init.headers as Record<string, string>)) {
           headers[k] = v;
         }
       }
+      return headers;
+    }
+
+    async function call<T>(url: string, init?: RequestInit): Promise<T> {
       // apiUrl() praefixt die absolute Bridge-Origin, falls konfiguriert
       // (sonst bleibt der Pfad relativ/same-origin). Siehe ../config/runtime.
-      const r = await fetch(apiUrl(url), { ...init, headers });
+      let r = await fetch(apiUrl(url), {
+        ...init,
+        headers: buildHeaders(accessToken, init),
+      });
+      // 401 -> Token evtl. abgelaufen: einmal frisch holen (Browser via MSAL,
+      // Teams via getAuthToken) und genau einmal erneut versuchen.
+      if (r.status === 401) {
+        const fresh = await getToken();
+        if (fresh) {
+          r = await fetch(apiUrl(url), {
+            ...init,
+            headers: buildHeaders(fresh, init),
+          });
+        }
+      }
       if (!r.ok) {
         const text = await r.text();
         throw new Error(`${r.status} ${text}`);
@@ -127,5 +143,5 @@ export function useBridgeApi() {
           body: JSON.stringify(patch),
         }),
     };
-  }, [accessToken, impersonatedRole]);
+  }, [accessToken, impersonatedRole, getToken]);
 }

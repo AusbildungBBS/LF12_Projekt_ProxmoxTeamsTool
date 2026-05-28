@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { app, authentication } from "@microsoft/teams-js";
 import {
@@ -70,7 +70,11 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   };
 
   const user = accounts[0] ?? null;
-  const isAuthenticated = !!user;
+  // Im Browser kommt der Login via MSAL -> accounts[0] ist gesetzt. In Teams
+  // liefert Teams-SSO (authentication.getAuthToken) nur einen accessToken und
+  // fuellt accounts[] NIE — wir gelten dort als angemeldet, sobald das Token da
+  // ist. Sonst bliebe der Teams-Tab dauerhaft im Login-Screen haengen.
+  const isAuthenticated = !!user || (isInTeams && !!accessToken);
 
   // Echte Roles aus ID-Token (immer, ohne Impersonation), damit das Switcher-
   // UI in der Profile-Bar erkennt ob der User wirklich Admin ist.
@@ -241,12 +245,20 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   };
 
   /**
-   * Get a valid access token (silently if possible, redirect if interaction needed).
+   * Hol ein gueltiges Access-Token und aktualisiere den State.
+   * - In Teams: authentication.getAuthToken() (Teams cached/erneuert selbst).
+   * - Im Browser: MSAL acquireTokenSilent (nutzt das Refresh-Token).
+   * Wird proaktiv (Timer unten) UND reaktiv (401-Retry im Bridge-Client)
+   * aufgerufen, damit Sessions nicht nach ~1 h Token-Ablauf ausfallen.
    */
-  const getToken = async (): Promise<string | null> => {
-    if (!user) return null;
-
+  const getToken = useCallback(async (): Promise<string | null> => {
     try {
+      if (isInTeams) {
+        const token = await authentication.getAuthToken();
+        setAccessToken(token);
+        return token;
+      }
+      if (!user) return null;
       const response = await instance.acquireTokenSilent({
         ...loginRequest,
         account: user,
@@ -255,14 +267,26 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
       return response.accessToken;
     } catch (err) {
       if (err instanceof InteractionRequiredAuthError) {
-        // Token expired or consent needed – navigate to login
-        await instance.acquireTokenRedirect(loginRequest);
-        return null; // page navigates away
+        // Interaktion noetig (Consent / Refresh-Token abgelaufen). Im Browser
+        // zur Anmeldung navigieren; in Teams gibt es keinen Redirect-Flow.
+        if (!isInTeams) await instance.acquireTokenRedirect(loginRequest);
+        return null;
       }
-      console.error("Token acquisition failed:", err);
+      console.error("Token refresh failed:", err);
       return null;
     }
-  };
+  }, [isInTeams, user, instance]);
+
+  // Proaktiver Refresh: Access-Tokens sind ~60 min gueltig. Alle ~45 min
+  // zentral erneuern, damit ALLE Consumer (Bridge-API, /api/me, VNC-WebSocket)
+  // ein frisches Token sehen. Greift im Browser (MSAL) wie in Teams (SSO).
+  useEffect(() => {
+    if (!accessToken) return;
+    const id = setInterval(() => {
+      void getToken();
+    }, 45 * 60 * 1000);
+    return () => clearInterval(id);
+  }, [accessToken, getToken]);
 
   return (
     <AuthContext.Provider

@@ -100,6 +100,16 @@ export function ConsolePage() {
   const { vmid } = useParams<{ vmid: string }>();
   const { accessToken } = useAuth();
   const api = useBridgeApi();
+  // api/Token aendern sich bei jedem Hintergrund-Refresh (~45 min). Wir halten
+  // die api in einer Ref, damit der VNC-Effect NICHT bei jedem Refresh die
+  // laufende Session abreisst — sie haengt nach dem ersten Call ohnehin am
+  // sessionKey, nicht mehr am Access-Token. Verbunden wird daher nur auf vmid /
+  // "Token ueberhaupt vorhanden" / manuellen Reconnect.
+  const apiRef = useRef(api);
+  useEffect(() => {
+    apiRef.current = api;
+  }, [api]);
+  const hasToken = !!accessToken;
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLDivElement>(null);
   const rfbRef = useRef<RFB | null>(null);
@@ -110,9 +120,18 @@ export function ConsolePage() {
   const [fullscreen, setFullscreen] = useState(false);
   const [showKeyboard, setShowKeyboard] = useState(false);
   const [kbLayoutName, setKbLayoutName] = useState<"default" | "shift">("default");
+  const [connectNonce, setConnectNonce] = useState(0);
+
+  // Manueller Reconnect: baut die VNC-Session neu auf. vncSession() erneuert
+  // dabei via 401-Retry bei abgelaufenem Token transparent das Access-Token.
+  const reconnect = useCallback(() => {
+    setStatus("connecting");
+    setDetail("");
+    setConnectNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
-    if (!vmid || !accessToken || !canvasRef.current) return;
+    if (!vmid || !hasToken || !canvasRef.current) return;
 
     let cancelled = false;
     let rfb: RFB | null = null;
@@ -120,7 +139,7 @@ export function ConsolePage() {
     (async () => {
       try {
         const numVmid = Number(vmid);
-        const { sessionKey, password } = await api.vncSession(numVmid);
+        const { sessionKey, password } = await apiRef.current.vncSession(numVmid);
         if (cancelled || !canvasRef.current) return;
 
         // wsUrl() leitet die ws(s)://-URL aus der konfigurierten Bridge-Origin
@@ -177,7 +196,7 @@ export function ConsolePage() {
         rfbRef.current = null;
       }
     };
-  }, [vmid, accessToken, api]);
+  }, [vmid, hasToken, connectNonce]);
 
   // Browser-Fullscreen-Events spiegeln in den State, damit Layout + Button
   // konsistent sind, egal wer den Fullscreen verlaesst (ESC, F11, Button).
@@ -250,6 +269,17 @@ export function ConsolePage() {
         <div className="console-toolbar icon-actions">
           <StatusBadge status={status} />
           {detail && <span className="console-detail">{detail}</span>}
+          {(status === "disconnected" || status === "error") && (
+            <button
+              className="icon-button wide"
+              aria-label="Neu verbinden"
+              title="VNC-Session neu aufbauen"
+              data-tooltip="Neu verbinden"
+              onClick={reconnect}
+            >
+              ↻ Neu verbinden
+            </button>
+          )}
           <button
             className="icon-button wide"
             aria-label="Ctrl+Alt+Del"
@@ -314,6 +344,11 @@ export function ConsolePage() {
         <div className="card error">
           <strong>Verbindung fehlgeschlagen.</strong>
           <p>{detail}</p>
+          <p>
+            <button className="btn btn-primary" onClick={reconnect}>
+              ↻ Neu verbinden
+            </button>
+          </p>
           <p>
             Pruefe im Bridge-Log nach <code>[bridge] upstream vnc</code> oder
             <code> [bridge] /ws/vnc</code>.

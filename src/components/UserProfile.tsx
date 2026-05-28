@@ -26,14 +26,23 @@ export function UserProfile() {
       <div className="welcome">
         <img src="/logo.svg" alt="Proxmox Teams Tool" className="welcome-mark" />
         <h2>Willkommen beim Proxmox Teams Tool</h2>
-        <p>
-          Melde dich mit deinem Microsoft-Account an, um auf deine VMs und
-          Templates zuzugreifen.
-        </p>
+        {isInTeams ? (
+          // In Teams uebernimmt Teams-SSO den Login (kein MSAL-Redirect-Button,
+          // der im iFrame ohnehin scheitern wuerde). Dieser Zweig greift nur,
+          // wenn das stille SSO (noch) kein Token geliefert hat.
+          <p>Anmeldung über Microsoft Teams …</p>
+        ) : (
+          <p>
+            Melde dich mit deinem Microsoft-Account an, um auf deine VMs und
+            Templates zuzugreifen.
+          </p>
+        )}
         {error && <p className="error">{error}</p>}
-        <button onClick={login} className="btn btn-primary btn-large">
-          Mit Microsoft anmelden
-        </button>
+        {!isInTeams && (
+          <button onClick={login} className="btn btn-primary btn-large">
+            Mit Microsoft anmelden
+          </button>
+        )}
       </div>
     );
   }
@@ -84,9 +93,12 @@ export function UserProfile() {
           </select>
         </label>
       )}
-      <button onClick={logout} className="btn btn-sm">
-        Sign out
-      </button>
+      {!isInTeams && (
+        // In Teams kommt Logout/Identitaet aus dem Teams-Client selbst.
+        <button onClick={logout} className="btn btn-sm">
+          Sign out
+        </button>
+      )}
     </div>
   );
 }
