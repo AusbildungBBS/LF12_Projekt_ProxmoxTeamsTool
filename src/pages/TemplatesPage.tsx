@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "../auth/authContext";
+import { useRoleFlags } from "../auth/useRoleFlags";
 import {
   useBridgeApi,
   type ClassInfo,
@@ -12,12 +13,9 @@ import { errMsg } from "../lib/errors";
 import { shortOid } from "../lib/format";
 
 export function TemplatesPage() {
-  const { hasRole, isAuthenticated, accessToken, identity } = useAuth();
+  const { isAuthenticated, accessToken, identity } = useAuth();
+  const { isStudent, isAdmin, isStaff: canManage } = useRoleFlags();
   const api = useBridgeApi();
-  const isStudent = hasRole("Proxmox.Student");
-  const isTeacher = hasRole("Proxmox.Teacher");
-  const isAdmin = hasRole("Proxmox.Admin");
-  const canManage = isTeacher || isAdmin;
 
   const [templates, setTemplates] = useState<Template[] | null>(null);
   const [assignable, setAssignable] = useState<ClassInfo[] | null>(null);

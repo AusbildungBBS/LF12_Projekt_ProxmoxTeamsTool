@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
+import { useRoleFlags } from "../auth/useRoleFlags";
 import {
   useBridgeApi,
   type ClassInfo,
@@ -18,9 +19,9 @@ import { errMsg } from "../lib/errors";
 type BulkAction = "start" | "shutdown" | "stop" | "delete";
 
 export function ClassesPage() {
-  const { hasRole, isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, accessToken } = useAuth();
+  const { isStaff } = useRoleFlags();
   const api = useBridgeApi();
-  const isStaff = hasRole("Proxmox.Admin") || hasRole("Proxmox.Teacher");
 
   const [classes, setClasses] = useState<ClassInfo[] | null>(null);
   const [templates, setTemplates] = useState<Template[]>([]);

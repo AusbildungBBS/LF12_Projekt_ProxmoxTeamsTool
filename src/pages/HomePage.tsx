@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
+import { useRoleFlags } from "../auth/useRoleFlags";
 import { UserProfile } from "../components/UserProfile";
 import {
   useBridgeApi,
@@ -16,11 +17,9 @@ import { errMsg } from "../lib/errors";
 import { shortOid } from "../lib/format";
 
 export function HomePage() {
-  const { isAuthenticated, hasRole, roles, accessToken, identity, impersonatedRole, error: authError } = useAuth();
+  const { isAuthenticated, roles, accessToken, identity, impersonatedRole, error: authError } = useAuth();
+  const { isAdmin, isTeacher, isStudent } = useRoleFlags();
   const api = useBridgeApi();
-  const isAdmin = hasRole("Proxmox.Admin");
-  const isTeacher = hasRole("Proxmox.Teacher");
-  const isStudent = hasRole("Proxmox.Student");
   const hasAnyRole = roles.length > 0;
 
   const [classes, setClasses] = useState<ClassInfo[] | null>(null);

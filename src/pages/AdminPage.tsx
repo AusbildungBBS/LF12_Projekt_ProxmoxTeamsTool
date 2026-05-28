@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
+import { useRoleFlags } from "../auth/useRoleFlags";
 import {
   useBridgeApi,
   type Template,
@@ -15,7 +16,8 @@ import { errMsg } from "../lib/errors";
 import { shortOid } from "../lib/format";
 
 export function AdminPage() {
-  const { hasRole, isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, accessToken } = useAuth();
+  const { isAdmin } = useRoleFlags();
   const api = useBridgeApi();
 
   const [templates, setTemplates] = useState<Template[] | null>(null);
@@ -49,7 +51,7 @@ export function AdminPage() {
   useVmAutoRefresh(vms, refresh);
 
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
-  if (!hasRole("Proxmox.Admin")) {
+  if (!isAdmin) {
     return (
       <section className="page">
         <p>Diese Seite ist nur fuer Admins.</p>

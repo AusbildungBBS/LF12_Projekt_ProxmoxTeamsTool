@@ -1,4 +1,5 @@
 import { useAuth } from "../auth/authContext";
+import { ROLES, type ImpersonatedRole } from "../auth/roles";
 
 export function UserProfile() {
   const {
@@ -71,17 +72,15 @@ export function UserProfile() {
         <label className="impersonate-select" title="Demo: andere Rolle aufsetzen">
           View as:
           <select
-            value={impersonatedRole ?? "Proxmox.Admin"}
+            value={impersonatedRole ?? ROLES.ADMIN}
             onChange={(e) => {
               const v = e.target.value;
-              setImpersonatedRole(v === "Proxmox.Admin" ? null : (v as
-                | "Proxmox.Teacher"
-                | "Proxmox.Student"));
+              setImpersonatedRole(v === ROLES.ADMIN ? null : (v as ImpersonatedRole));
             }}
           >
-            <option value="Proxmox.Admin">Admin (echt)</option>
-            <option value="Proxmox.Teacher">Lehrer</option>
-            <option value="Proxmox.Student">Schueler</option>
+            <option value={ROLES.ADMIN}>Admin (echt)</option>
+            <option value={ROLES.TEACHER}>Lehrer</option>
+            <option value={ROLES.STUDENT}>Schueler</option>
           </select>
         </label>
       )}

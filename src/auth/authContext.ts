@@ -1,5 +1,10 @@
 import { createContext, useContext } from "react";
 import type { AccountInfo } from "@azure/msal-browser";
+import type { ImpersonatedRole } from "./roles";
+
+// ImpersonatedRole stammt aus der Rollen-SSOT (roles.ts); hier re-exportiert,
+// damit bestehende Importe (z.B. TeamsAuthProvider) weiter funktionieren.
+export type { ImpersonatedRole };
 
 // Context, Hook + Typen leben hier (nicht in TeamsAuthProvider.tsx), damit die
 // Provider-Datei ausschliesslich Komponenten exportiert — Voraussetzung dafuer,
@@ -23,11 +28,6 @@ export interface BridgeIdentity {
   classes: string[];
   source: "standard" | "edu";
 }
-
-export type ImpersonatedRole =
-  | "Proxmox.Admin"
-  | "Proxmox.Teacher"
-  | "Proxmox.Student";
 
 export interface AuthContextType {
   isInTeams: boolean;

@@ -6,11 +6,12 @@ import {
 } from "./authContext";
 import type { AccountInfo } from "@azure/msal-browser";
 import { STORAGE_KEY, VALID_ROLES, type DevRole } from "./devAuthRole";
+import { ROLES, type RoleClaim } from "./roles";
 
-const ROLE_CLAIM_MAP: Record<DevRole, string> = {
-  admin: "Proxmox.Admin",
-  teacher: "Proxmox.Teacher",
-  student: "Proxmox.Student",
+const ROLE_CLAIM_MAP: Record<DevRole, RoleClaim> = {
+  admin: ROLES.ADMIN,
+  teacher: ROLES.TEACHER,
+  student: ROLES.STUDENT,
 };
 
 const FAKE_PROFILES: Record<DevRole, GraphProfile> = {
@@ -53,7 +54,7 @@ export function DevFakeAuthProvider({
   role: DevRole;
   children: ReactNode;
 }) {
-  const roles = [ROLE_CLAIM_MAP[role]];
+  const roles: string[] = [ROLE_CLAIM_MAP[role]];
   const profile = FAKE_PROFILES[role];
   const classes = FAKE_CLASSES[role];
 

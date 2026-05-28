@@ -1,10 +1,10 @@
 import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
+import { useRoleFlags } from "../auth/useRoleFlags";
 
 export function Layout() {
-  const { isAuthenticated, hasRole } = useAuth();
-  const isStaff = hasRole("Proxmox.Admin") || hasRole("Proxmox.Teacher");
-  const isAdmin = hasRole("Proxmox.Admin");
+  const { isAuthenticated } = useAuth();
+  const { isAdmin, isStaff } = useRoleFlags();
 
   return (
     <div className="app">

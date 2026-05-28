@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
+import { useRoleFlags } from "../auth/useRoleFlags";
 import { useBridgeApi, type VmDTO } from "../api/bridge";
 import { StatusBadge } from "../components/StatusBadge";
 import { ErrorCard } from "../components/ErrorCard";
@@ -49,10 +50,10 @@ function Gauge({ label, value, max, suffix = "", fraction = false }: GaugeProps)
 }
 
 export function MyVMsPage() {
-  const { hasRole, isAuthenticated, accessToken } = useAuth();
+  const { isAuthenticated, accessToken } = useAuth();
+  const { isStudent } = useRoleFlags();
   const api = useBridgeApi();
   const navigate = useNavigate();
-  const isStudent = hasRole("Proxmox.Student");
 
   const [vms, setVms] = useState<VmDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);

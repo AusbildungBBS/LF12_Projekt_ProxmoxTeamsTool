@@ -13,6 +13,7 @@ import type {
   BridgeIdentity,
   ImpersonatedRole,
 } from "./authContext";
+import { ROLES, isImpersonatedRole } from "./roles";
 
 // ── MSAL Instance ──────────────────────────────────────────────────────────────
 
@@ -57,9 +58,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     () => {
       if (typeof window === "undefined") return null;
       const v = localStorage.getItem(IMPERSONATE_KEY);
-      if (v === "Proxmox.Admin" || v === "Proxmox.Teacher" || v === "Proxmox.Student") {
-        return v;
-      }
+      if (isImpersonatedRole(v)) return v;
       return null;
     }
   );
@@ -77,7 +76,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const idTokenRoles =
     (user?.idTokenClaims as { roles?: string[] } | undefined)?.roles ?? [];
   const realRoles = identity?.roles ?? idTokenRoles;
-  const realIsAdmin = realRoles.includes("Proxmox.Admin");
+  const realIsAdmin = realRoles.includes(ROLES.ADMIN);
 
   // Die "gefuehlten" Roles fuer die UI: bei aktiver Impersonation ueberschrieben.
   const roles = impersonatedRole ? [impersonatedRole] : realRoles;
