@@ -5,6 +5,8 @@ import Keyboard from "react-simple-keyboard";
 import "react-simple-keyboard/build/css/index.css";
 import { useAuth } from "../auth/authContext";
 import { useBridgeApi } from "../api/bridge";
+import { StatusBadge } from "../components/StatusBadge";
+import { errMsg } from "../lib/errors";
 
 // Mapping von simple-keyboard-Buttons auf X11 Keysym + DOM event.code, das
 // noVNC bzw. Proxmox-VNC fuer den Tastenanschlag erwartet.
@@ -155,7 +157,7 @@ export function ConsolePage() {
       } catch (e) {
         if (!cancelled) {
           setStatus("error");
-          setDetail(e instanceof Error ? e.message : String(e));
+          setDetail(errMsg(e));
         }
       }
     })();
@@ -242,7 +244,7 @@ export function ConsolePage() {
         ref={wrapRef}
       >
         <div className="console-toolbar icon-actions">
-          <span className={`badge badge-${status}`}>{status}</span>
+          <StatusBadge status={status} />
           {detail && <span className="console-detail">{detail}</span>}
           <button
             className="icon-button wide"

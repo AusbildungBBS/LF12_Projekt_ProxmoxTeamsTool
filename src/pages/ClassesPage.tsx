@@ -7,33 +7,15 @@ import {
   type Template,
   type VmDTO,
 } from "../api/bridge";
+import { VmStatsPill } from "../components/VmStatsPill";
+import { StatusBadge } from "../components/StatusBadge";
+import { ErrorCard } from "../components/ErrorCard";
+import { LoadingCard } from "../components/LoadingCard";
+import { EmptyCard } from "../components/EmptyCard";
+import { useVmAutoRefresh } from "../hooks/useVmAutoRefresh";
+import { errMsg } from "../lib/errors";
 
 type BulkAction = "start" | "shutdown" | "stop" | "delete";
-
-function VmStatsPill({ vm }: { vm: VmDTO }) {
-  if (vm.status !== "running") return null;
-  // Bevorzugt 5-min-Average aus Proxmox-RRD, Fallback aktueller Wert.
-  const cpu = vm.cpuAvg5m ?? vm.cpu ?? 0;
-  const mem = vm.memAvg5m ?? vm.mem ?? 0;
-  const cpuPct = Math.round(cpu * 100);
-  const memUsedMb = Math.round(mem / 1024 / 1024);
-  const memMaxMb = vm.maxmem ? Math.round(vm.maxmem / 1024 / 1024) : 0;
-  const memPct = memMaxMb > 0 ? Math.round((memUsedMb / memMaxMb) * 100) : 0;
-  const cpuTone = cpuPct > 85 ? "hot" : cpuPct > 60 ? "warm" : "";
-  const memTone = memPct > 85 ? "hot" : memPct > 60 ? "warm" : "";
-  const tooltip =
-    vm.cpuAvg5m !== undefined
-      ? "Durchschnitt letzte 5 min (Proxmox-RRD)"
-      : "aktueller Wert (kein 5-min-Sample verfuegbar)";
-  return (
-    <span className="stats-pill" title={tooltip}>
-      <span className={`pill-chip ${cpuTone}`}>CPU {cpuPct}% Ø5m</span>
-      <span className={`pill-chip ${memTone}`}>
-        RAM {memUsedMb}/{memMaxMb} MB Ø5m
-      </span>
-    </span>
-  );
-}
 
 export function ClassesPage() {
   const { hasRole, isAuthenticated, accessToken } = useAuth();
@@ -59,7 +41,7 @@ export function ClassesPage() {
       setTemplates(t);
       setVms(v);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     }
   }, [api]);
 
@@ -71,12 +53,7 @@ export function ClassesPage() {
   }, [accessToken, refresh]);
 
   // Auto-Refresh fuer Live-Stats wenn was laeuft.
-  useEffect(() => {
-    const anyRunning = vms.some((v) => v.status === "running");
-    if (!anyRunning) return;
-    const id = setInterval(refresh, 5000);
-    return () => clearInterval(id);
-  }, [vms, refresh]);
+  useVmAutoRefresh(vms, refresh);
 
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
   if (!isStaff) {
@@ -149,18 +126,18 @@ export function ClassesPage() {
         </p>
       </header>
 
-      {error && <div className="card error">Fehler: {error}</div>}
+      <ErrorCard message={error} />
       {hint && <div className="card hint">{hint}</div>}
-      {classes === null && <div className="card">Lade Klassen ...</div>}
+      {classes === null && <LoadingCard label="Lade Klassen ..." />}
 
       {classes && classes.length === 0 && (
-        <div className="card empty">
+        <EmptyCard>
           <p>
             Du bist in keiner aktiven Klasse fuer dieses Tool. Sobald ein
             Template einer deiner Klassen-Groups zugewiesen wird, taucht sie
             hier auf.
           </p>
-        </div>
+        </EmptyCard>
       )}
 
       {classes && classes.length > 0 && (
@@ -214,9 +191,7 @@ export function ClassesPage() {
                         <li key={v.vmid}>
                           <Link to={`/my-vms#vm-${v.vmid}`}>{v.name}</Link>{" "}
                           <span className="muted">(VMID {v.vmid})</span>{" "}
-                          <span className={`badge badge-${v.status}`}>
-                            {v.status}
-                          </span>
+                          <StatusBadge status={v.status} />
                           <VmStatsPill vm={v} />
                           {v.status === "running" && (
                             <Link

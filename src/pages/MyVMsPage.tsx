@@ -2,6 +2,13 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { useBridgeApi, type VmDTO } from "../api/bridge";
+import { StatusBadge } from "../components/StatusBadge";
+import { ErrorCard } from "../components/ErrorCard";
+import { LoadingCard } from "../components/LoadingCard";
+import { EmptyCard } from "../components/EmptyCard";
+import { useVmAutoRefresh } from "../hooks/useVmAutoRefresh";
+import { errMsg } from "../lib/errors";
+import { bytesToMb } from "../lib/format";
 
 function formatUptime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -56,7 +63,7 @@ export function MyVMsPage() {
     try {
       setVms(await api.listVms());
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     }
   }, [api]);
 
@@ -68,12 +75,7 @@ export function MyVMsPage() {
   }, [accessToken, refresh]);
 
   // Auto-Refresh fuer Live-Stats: wenn mindestens eine VM laeuft, alle 5 s.
-  useEffect(() => {
-    const anyRunning = vms?.some((v) => v.status === "running");
-    if (!anyRunning) return;
-    const id = setInterval(refresh, 5000);
-    return () => clearInterval(id);
-  }, [vms, refresh]);
+  useVmAutoRefresh(vms, refresh);
 
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
 
@@ -92,7 +94,7 @@ export function MyVMsPage() {
       else await api.deleteVm(vm.vmid);
       await refresh();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     } finally {
       setBusyId(null);
     }
@@ -113,17 +115,17 @@ export function MyVMsPage() {
         </p>
       </header>
 
-      {error && <div className="card error">Fehler: {error}</div>}
-      {vms === null && <div className="card">Lade VMs ...</div>}
+      <ErrorCard message={error} />
+      {vms === null && <LoadingCard label="Lade VMs ..." />}
 
       {vms && vms.length === 0 && (
-        <div className="card empty">
+        <EmptyCard>
           <p>
             Aktuell keine VMs in deinem Sichtbereich. {isStudent
               ? "Klick auf der Templates-Seite auf \"VM aus diesem Template anlegen\"."
               : "Schueler in deinen Klassen haben noch keine VMs erstellt."}
           </p>
-        </div>
+        </EmptyCard>
       )}
 
       {vms && vms.length > 0 && (
@@ -133,7 +135,7 @@ export function MyVMsPage() {
               <div className="card-row">
                 <strong>{v.name}</strong>
                 <span className="badge">VMID {v.vmid}</span>
-                <span className={`badge badge-${v.status}`}>{v.status}</span>
+                <StatusBadge status={v.status} />
               </div>
               <div className="card-meta">
                 {v.sourceTemplate && (
@@ -145,7 +147,7 @@ export function MyVMsPage() {
                   </span>
                 )}
                 <span>{v.cpus ?? "?"} vCPU</span>
-                <span>{v.maxmem ? Math.round(v.maxmem / 1024 / 1024) + " MB" : "? MB"}</span>
+                <span>{v.maxmem ? bytesToMb(v.maxmem) + " MB" : "? MB"}</span>
                 <span>Node {v.node}</span>
                 {v.uptime !== undefined && v.uptime > 0 && (
                   <span title="Laufzeit seit letztem Start">

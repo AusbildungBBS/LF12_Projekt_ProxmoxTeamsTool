@@ -8,26 +8,12 @@ import {
   type Template,
   type VmDTO,
 } from "../api/bridge";
-
-function VmStatsPill({ vm }: { vm: VmDTO }) {
-  if (vm.status !== "running") return null;
-  const cpu = vm.cpuAvg5m ?? vm.cpu ?? 0;
-  const mem = vm.memAvg5m ?? vm.mem ?? 0;
-  const cpuPct = Math.round(cpu * 100);
-  const memUsedMb = Math.round(mem / 1024 / 1024);
-  const memMaxMb = vm.maxmem ? Math.round(vm.maxmem / 1024 / 1024) : 0;
-  const memPct = memMaxMb > 0 ? Math.round((memUsedMb / memMaxMb) * 100) : 0;
-  return (
-    <span className="stats-pill">
-      <span className={`pill-chip ${cpuPct > 85 ? "hot" : cpuPct > 60 ? "warm" : ""}`}>
-        CPU {cpuPct}% Ø5m
-      </span>
-      <span className={`pill-chip ${memPct > 85 ? "hot" : memPct > 60 ? "warm" : ""}`}>
-        RAM {memUsedMb}/{memMaxMb} MB Ø5m
-      </span>
-    </span>
-  );
-}
+import { VmStatsPill } from "../components/VmStatsPill";
+import { StatusBadge } from "../components/StatusBadge";
+import { ErrorCard } from "../components/ErrorCard";
+import { useVmAutoRefresh } from "../hooks/useVmAutoRefresh";
+import { errMsg } from "../lib/errors";
+import { shortOid } from "../lib/format";
 
 export function HomePage() {
   const { isAuthenticated, hasRole, roles, accessToken, identity, impersonatedRole, error: authError } = useAuth();
@@ -56,7 +42,7 @@ export function HomePage() {
       setVms(v);
       setError(null);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     }
   }, [api, hasAnyRole, isAdmin, isTeacher, isStudent]);
 
@@ -81,12 +67,7 @@ export function HomePage() {
     setVms([]);
   }
 
-  useEffect(() => {
-    const anyRunning = vms.some((v) => v.status === "running");
-    if (!anyRunning) return;
-    const id = setInterval(refresh, 5000);
-    return () => clearInterval(id);
-  }, [vms, refresh]);
+  useVmAutoRefresh(vms, refresh);
 
   const ownedTemplates = identity
     ? templates.filter((t) => t.ownerOid === identity.oid)
@@ -96,7 +77,7 @@ export function HomePage() {
     <>
       <UserProfile />
 
-      {authError && <div className="card error">{authError}</div>}
+      <ErrorCard message={authError} prefix="" />
 
       {isAuthenticated && !hasAnyRole && !authError && (
         <div className="card warning">
@@ -109,7 +90,7 @@ export function HomePage() {
         </div>
       )}
 
-      {error && <div className="card error">Fehler: {error}</div>}
+      <ErrorCard message={error} />
 
       {/* Admin: 3-Spalten-Overview wie /admin */}
       {isAdmin && (
@@ -134,7 +115,7 @@ export function HomePage() {
                   <br />
                   <small className="muted">
                     {t.classes.length} Klasse(n) · Owner{" "}
-                    {t.ownerOid?.slice(0, 8) ?? "—"}
+                    {shortOid(t.ownerOid)}
                   </small>
                 </li>
               ))}
@@ -154,7 +135,7 @@ export function HomePage() {
                   <Link to={`/my-vms#vm-${v.vmid}`}>
                     <strong>{v.name}</strong>
                   </Link>{" "}
-                  <span className={`badge badge-${v.status}`}>{v.status}</span>
+                  <StatusBadge status={v.status} />
                   {v.status === "running" && (
                     <Link
                       to={`/vms/${v.vmid}/console`}
@@ -273,9 +254,7 @@ export function HomePage() {
                 {vms.map((v) => (
                   <li key={v.vmid}>
                     <strong>{v.name}</strong>{" "}
-                    <span className={`badge badge-${v.status}`}>
-                      {v.status}
-                    </span>
+                    <StatusBadge status={v.status} />
                     <VmStatsPill vm={v} />
                   </li>
                 ))}

@@ -5,6 +5,11 @@ import {
   type ClassInfo,
   type Template,
 } from "../api/bridge";
+import { ErrorCard } from "../components/ErrorCard";
+import { LoadingCard } from "../components/LoadingCard";
+import { EmptyCard } from "../components/EmptyCard";
+import { errMsg } from "../lib/errors";
+import { shortOid } from "../lib/format";
 
 export function TemplatesPage() {
   const { hasRole, isAuthenticated, accessToken, identity } = useAuth();
@@ -27,7 +32,7 @@ export function TemplatesPage() {
       const list = await api.listTemplates();
       setTemplates(list);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     }
   }, [api]);
 
@@ -50,7 +55,7 @@ export function TemplatesPage() {
     try {
       return await op();
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
       throw e;
     } finally {
       setBusyId(null);
@@ -109,20 +114,20 @@ export function TemplatesPage() {
         </p>
       </header>
 
-      {error && <div className="card error">Fehler: {error}</div>}
+      <ErrorCard message={error} />
       {hint && <div className="card hint">{hint}</div>}
 
-      {templates === null && <div className="card">Lade Templates ...</div>}
+      {templates === null && <LoadingCard label="Lade Templates ..." />}
 
       {templates && templates.length === 0 && (
-        <div className="card empty">
+        <EmptyCard>
           <p>
             Keine Templates in deinem Sichtbereich.{" "}
             {isStudent
               ? "Sobald ein Lehrer ein Template fuer deine Klasse freigibt, taucht es hier auf."
               : "Lege ein Template in Proxmox an und tag es mit pttool-tpl."}
           </p>
-        </div>
+        </EmptyCard>
       )}
 
       {templates && templates.length > 0 && (
@@ -155,7 +160,7 @@ export function TemplatesPage() {
                   <span>Klassen: {t.classes.length}</span>
                   <span>Node: {t.node}</span>
                   {t.ownerOid && !isOwn && (
-                    <span>Owner: {t.ownerOid.slice(0, 8)}…</span>
+                    <span>Owner: {shortOid(t.ownerOid)}…</span>
                   )}
                 </div>
 

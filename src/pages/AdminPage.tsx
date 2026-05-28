@@ -7,29 +7,12 @@ import {
   type VmDTO,
   type ClassInfo,
 } from "../api/bridge";
-
-function VmStatsPill({ vm }: { vm: VmDTO }) {
-  if (vm.status !== "running") return null;
-  const cpu = vm.cpuAvg5m ?? vm.cpu ?? 0;
-  const mem = vm.memAvg5m ?? vm.mem ?? 0;
-  const cpuPct = Math.round(cpu * 100);
-  const memUsedMb = Math.round(mem / 1024 / 1024);
-  const memMaxMb = vm.maxmem ? Math.round(vm.maxmem / 1024 / 1024) : 0;
-  const memPct = memMaxMb > 0 ? Math.round((memUsedMb / memMaxMb) * 100) : 0;
-  return (
-    <span
-      className="stats-pill"
-      title={vm.cpuAvg5m !== undefined ? "Durchschnitt letzte 5 min" : "current"}
-    >
-      <span className={`pill-chip ${cpuPct > 85 ? "hot" : cpuPct > 60 ? "warm" : ""}`}>
-        CPU {cpuPct}% Ø5m
-      </span>
-      <span className={`pill-chip ${memPct > 85 ? "hot" : memPct > 60 ? "warm" : ""}`}>
-        RAM {memUsedMb}/{memMaxMb} MB Ø5m
-      </span>
-    </span>
-  );
-}
+import { VmStatsPill } from "../components/VmStatsPill";
+import { StatusBadge } from "../components/StatusBadge";
+import { ErrorCard } from "../components/ErrorCard";
+import { useVmAutoRefresh } from "../hooks/useVmAutoRefresh";
+import { errMsg } from "../lib/errors";
+import { shortOid } from "../lib/format";
 
 export function AdminPage() {
   const { hasRole, isAuthenticated, accessToken } = useAuth();
@@ -52,7 +35,7 @@ export function AdminPage() {
       setVms(v);
       setClasses(c);
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
+      setError(errMsg(e));
     }
   }, [api]);
 
@@ -63,12 +46,7 @@ export function AdminPage() {
     })();
   }, [accessToken, refresh]);
 
-  useEffect(() => {
-    const anyRunning = vms?.some((v) => v.status === "running");
-    if (!anyRunning) return;
-    const id = setInterval(refresh, 5000);
-    return () => clearInterval(id);
-  }, [vms, refresh]);
+  useVmAutoRefresh(vms, refresh);
 
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
   if (!hasRole("Proxmox.Admin")) {
@@ -86,7 +64,7 @@ export function AdminPage() {
         <p className="page-subtitle">Globale Sicht ueber alle Templates, VMs und Klassen.</p>
       </header>
 
-      {error && <div className="card error">Fehler: {error}</div>}
+      <ErrorCard message={error} />
 
       <div className="admin-grid">
         <div className="card">
@@ -97,7 +75,7 @@ export function AdminPage() {
                 <strong>{t.name}</strong> (VMID {t.vmid})
                 {t.isPublic && <span className="badge badge-public">public</span>}
                 <br />
-                <small>{t.classes.length} Klassen, Owner {t.ownerOid?.slice(0, 8) ?? "—"}</small>
+                <small>{t.classes.length} Klassen, Owner {shortOid(t.ownerOid)}</small>
               </li>
             ))}
           </ul>
@@ -112,7 +90,7 @@ export function AdminPage() {
                   <strong>{v.name}</strong>
                 </Link>{" "}
                 (VMID {v.vmid})
-                <span className={`badge badge-${v.status}`}>{v.status}</span>
+                <StatusBadge status={v.status} />
                 {v.status === "running" && (
                   <Link
                     to={`/vms/${v.vmid}/console`}
@@ -124,7 +102,7 @@ export function AdminPage() {
                 )}
                 <br />
                 <small>
-                  Owner {v.ownerOid?.slice(0, 8) ?? "—"} · aus Template{" "}
+                  Owner {shortOid(v.ownerOid)} · aus Template{" "}
                   {v.sourceTemplate
                     ? v.sourceTemplate.name ?? `VMID ${v.sourceTemplate.vmid}`
                     : "—"}
