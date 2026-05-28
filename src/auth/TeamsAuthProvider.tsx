@@ -75,6 +75,20 @@ function decodeJwtPayload(token: string | null): JwtClaims | null {
   }
 }
 
+// Mappt die Teams-Tab-entityId (aus app.getContext().page.id) auf die App-Route,
+// die dieser Tab als Root laedt. Damit erkennt das Layout, ob man am Root des
+// AKTIVEN Tabs ist (Header ausblendbar) oder intern woanders hin navigiert hat.
+function tabRootForEntity(entityId?: string): string {
+  switch (entityId) {
+    case "templates":
+      return "/templates";
+    case "vms":
+      return "/my-vms";
+    default: // "dashboard" + Fallback
+      return "/";
+  }
+}
+
 // ── Inner Auth Provider (needs MSAL context) ───────────────────────────────────
 
 function AuthProviderInner({ children }: { children: ReactNode }) {
@@ -91,6 +105,8 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     displayName?: string;
     upn?: string;
   } | null>(null);
+  // Root-Route des aktiven Teams-Tabs (siehe tabRootForEntity).
+  const [teamsTabRoot, setTeamsTabRoot] = useState<string | null>(null);
   const IMPERSONATE_KEY = "pttool.impersonate";
   const [impersonatedRole, setImpersonatedRoleState] = useState<ImpersonatedRole | null>(
     () => {
@@ -210,6 +226,9 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         const context = await app.getContext();
         if (context) {
           setIsInTeams(true);
+          // Aktiven Teams-Tab merken (dessen Root-Route), damit das Layout den
+          // Header am Tab-Root ausblenden kann.
+          setTeamsTabRoot(tabRootForEntity(context.page?.id));
           // Name/UPN aus dem Teams-Kontext merken — dient zusammen mit den
           // Rollen aus dem SSO-Token als Anzeige-Fallback, falls die Bridge
           // (die das echte Graph-Profil liefert) gerade aus ist.
@@ -385,6 +404,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         isInTeams,
+        teamsTabRoot,
         isAuthenticated,
         user,
         accessToken,

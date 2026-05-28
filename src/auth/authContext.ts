@@ -44,6 +44,10 @@ export interface AuthSession {
 
 export interface AuthContextType {
   isInTeams: boolean;
+  // In Teams: Root-Route des aktiven Teams-Tabs (entityId -> Pfad: "/",
+  // "/templates", "/my-vms"). null im Browser. Damit erkennt das Layout, ob man
+  // am Tab-Root ist (Header ausblendbar) oder intern woanders hin navigiert hat.
+  teamsTabRoot: string | null;
   isAuthenticated: boolean;
   user: AccountInfo | null;
   accessToken: string | null;
@@ -68,6 +72,7 @@ export interface AuthContextType {
 
 export const AuthContext = createContext<AuthContextType>({
   isInTeams: false,
+  teamsTabRoot: null,
   isAuthenticated: false,
   user: null,
   accessToken: null,

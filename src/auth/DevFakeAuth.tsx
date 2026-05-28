@@ -80,6 +80,7 @@ export function DevFakeAuthProvider({
     <AuthContext.Provider
       value={{
         isInTeams: false,
+        teamsTabRoot: null,
         isAuthenticated: true,
         user: fakeUser,
         accessToken: "dev-fake-token",
