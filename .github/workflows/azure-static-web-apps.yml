@@ -71,3 +71,6 @@ jobs:
         with:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN }}
           action: close
+          # Beim Close ungenutzt, aber die Action deklariert app_location als
+          # required input -> leer setzen, damit der Schema-Linter ruhig ist.
+          app_location: ""
