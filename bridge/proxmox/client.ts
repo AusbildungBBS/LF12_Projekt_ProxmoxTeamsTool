@@ -1,4 +1,4 @@
-import type { CloneOptions, Task, TaskRef, VM, VMConfig, VMID } from "./types";
+import type { CloneOptions, Task, TaskRef, VM, VMConfig, VMID } from "./types.js";
 
 // Low-Level-Proxmox-API-Oberfläche, die die Bridge benötigt.
 //

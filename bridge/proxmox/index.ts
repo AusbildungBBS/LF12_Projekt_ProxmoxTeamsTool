@@ -1,5 +1,5 @@
-export type { ProxmoxClient } from "./client";
-export { ProxmoxNotConfiguredError } from "./client";
+export type { ProxmoxClient } from "./client.js";
+export { ProxmoxNotConfiguredError } from "./client.js";
 export type {
   CloneOptions,
   Task,
@@ -10,16 +10,16 @@ export type {
   VMID,
   VMRef,
   VMStatus,
-} from "./types";
+} from "./types.js";
 export {
   RealProxmoxClient,
   parseTags,
   serializeTags,
-} from "./RealProxmoxClient";
+} from "./RealProxmoxClient.js";
 
-import { RealProxmoxClient } from "./RealProxmoxClient";
-import type { ProxmoxClient } from "./client";
-import { envOrFile } from "../env";
+import { RealProxmoxClient } from "./RealProxmoxClient.js";
+import type { ProxmoxClient } from "./client.js";
+import { envOrFile } from "../env.js";
 
 // Factory — gibt einen ProxmoxClient zurück, wenn die Env vollständig konfiguriert ist, sonst null
 // (in diesem Fall verzichtet die Bridge serverseitig auf das Filtern von Klassen).

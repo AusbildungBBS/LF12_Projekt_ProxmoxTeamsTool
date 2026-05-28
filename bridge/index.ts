@@ -8,10 +8,10 @@ import { randomBytes } from "crypto";
 import jwt, { JwtPayload } from "jsonwebtoken";
 import jwksClient from "jwks-rsa";
 import { WebSocketServer, WebSocket } from "ws";
-import { createProxmoxClientFromEnv } from "./proxmox";
-import type { VM, VMID } from "./proxmox";
-import { filterToActiveClasses, clearActiveClassCache } from "./classes";
-import { TAG, tagValue, tagValues, hasTag } from "./tags";
+import { createProxmoxClientFromEnv } from "./proxmox/index.js";
+import type { VM, VMID } from "./proxmox/index.js";
+import { filterToActiveClasses, clearActiveClassCache } from "./classes.js";
+import { TAG, tagValue, tagValues, hasTag } from "./tags.js";
 import {
   type BridgeIdentity,
   isAdmin,
@@ -23,9 +23,9 @@ import {
   mapEduRoleToAppRoles,
   filterAppRoles,
   applyImpersonation,
-} from "./authz";
-import { buildVmName } from "./naming";
-import { envOrFile } from "./env";
+} from "./authz.js";
+import { buildVmName } from "./naming.js";
+import { envOrFile } from "./env.js";
 
 dotenv.config();
 

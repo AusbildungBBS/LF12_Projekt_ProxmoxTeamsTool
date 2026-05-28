@@ -1,5 +1,5 @@
-import { TAG, tagValue, tagValues, hasTag } from "./tags";
-import type { VM } from "./proxmox";
+import { TAG, tagValue, tagValues, hasTag } from "./tags.js";
+import type { VM } from "./proxmox/index.js";
 
 // Reine Identitäts-, Rollen- und Autorisierungslogik der Bridge — bewusst
 // ohne I/O / Express / Seiteneffekte, damit sie isoliert unit-testbar ist.

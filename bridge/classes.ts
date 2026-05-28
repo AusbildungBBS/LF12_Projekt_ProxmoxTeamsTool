@@ -1,4 +1,4 @@
-import type { ProxmoxClient } from "./proxmox";
+import type { ProxmoxClient } from "./proxmox/index.js";
 
 // Whitelist aktiver Klassen. Eine Group wird zu einer "Pttool-Klasse" dadurch,
 // dass mindestens ein Template in Proxmox mit `tpl-class-<group-oid>` getaggt ist.

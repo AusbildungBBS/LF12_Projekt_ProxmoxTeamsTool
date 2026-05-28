@@ -21,10 +21,13 @@ services:
     image: pttool/bridge:dev
     container_name: pttool-bridge
     restart: unless-stopped
-    # Config aus .env (Environment-Variablen). Damit liest die Bridge auch
-    # CORS_ALLOWED_ORIGINS aus .env — leer = offen (same-origin), gesetzt = nur
-    # diese Origins (z.B. die SWA-URL des Frontends), wenn Frontend und Bridge
-    # auf verschiedenen Origins liegen.
+    # Config aus .env. WICHTIG: genau `.env` (nicht .env.backend o.ae.), denn
+    # Compose liest `.env` automatisch AUCH fuer die ${CF_TUNNEL_TOKEN}/
+    # ${BRIDGE_BIND}-Interpolation unten — so kommen Container-Config (hier) und
+    # Tunnel-Token (Interpolation) aus EINER Datei, ganz ohne --env-file-Flag.
+    # Auf der VM: `cp .env.backend.example .env` und dort ausfuellen.
+    # (env_file laesst sich NICHT durch Auto-.env-Loading ersetzen — Letzteres
+    #  fuellt nur Interpolation, nicht die Container-Umgebung.)
     env_file: .env
     # Nur auf Loopback veröffentlicht: der Tunnel ist der eigentliche Ingress,
     # eine LAN-/Internet-Exposition entfällt. cloudflared erreicht die Bridge

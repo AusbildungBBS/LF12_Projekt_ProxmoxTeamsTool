@@ -1,6 +1,6 @@
 import axios, { AxiosInstance, AxiosResponse } from "axios";
 import https from "https";
-import type { ProxmoxClient } from "./client";
+import type { ProxmoxClient } from "./client.js";
 import type {
   CloneOptions,
   Task,
@@ -9,7 +9,7 @@ import type {
   VMConfig,
   VMID,
   VMStatus,
-} from "./types";
+} from "./types.js";
 
 // HTTP-Client gegen ein Proxmox-VE-Cluster, authentifiziert über API-Token.
 // Token-Auth umgeht CSRF (der Cookie+CSRFPreventionToken-Tanz ist nur

@@ -92,13 +92,27 @@ PROXMOX_TOKEN_SECRET=<uuid>
 
 > Die Route lebt im Dashboard, **nicht** in einer lokalen `config.yml` (Token-/Remote-Managed-Tunnel). `bridge` ist der Compose-Service-Name — cloudflared erreicht ihn über das interne Compose-Netz. WebSockets (VNC) gehen ohne Zusatzconfig durch.
 
-Starten:
+> **Warum die Datei `.env` heißen muss — und `env_file` trotzdem nötig ist.**
+> Zwei getrennte Schichten lesen dieselbe Datei:
+> - **`env_file: .env`** schiebt die Variablen in den **Bridge-Container** (die Bridge liest `AZURE_*`, `PROXMOX_*`, `CORS_ALLOWED_ORIGINS` aus ihrer Container-Umgebung).
+> - **Automatisches `.env`-Loading** ersetzt nur die `${…}`-**Interpolation** in der Compose-Datei (`${CF_TUNNEL_TOKEN}`, `${BRIDGE_BIND}`) — das landet *nicht* im Container.
+>
+> Beide lesen `.env`. Heißt die Datei anders (z. B. `.env.backend`), greift das Auto-Loading nicht → `CF_TUNNEL_TOKEN` bleibt leer (Tunnel ohne Token), außer man hängt `--env-file .env.backend` an. `env_file` ganz wegzulassen geht ebenfalls nicht — dann bekäme die Bridge gar keine Config (`FATAL: AZURE_TENANT_ID required`). **Fazit: Datei `.env` nennen, `env_file: .env` behalten, kein Flag.**
+
+Starten — Backend-only (`-f docker-compose.backend.yml` lädt nur `bridge` + `cloudflared`, kein Frontend):
 
 ```bash
+# Bridge + Tunnel (Standard auf der VM):
 docker compose -f docker-compose.backend.yml --profile tunnel up -d --build
-docker compose -f docker-compose.backend.yml ps          # bridge healthy, cloudflared up
-docker compose -f docker-compose.backend.yml logs -f cloudflared
+# nur die Bridge, ohne Tunnel (z. B. hinter eigenem Reverse-Proxy mit TLS):
+docker compose -f docker-compose.backend.yml up -d --build
+
+docker compose -f docker-compose.backend.yml ps                    # Status (bridge + cloudflared healthy)
+docker compose -f docker-compose.backend.yml logs -f cloudflared   # Tunnel-Log
+docker compose -f docker-compose.backend.yml --profile tunnel down # stoppen
 ```
+
+`--build` nur beim ersten Start bzw. nach Code-Änderungen. **Kein `--env-file`-Flag** — solange das Runtime-File `.env` heißt (siehe Box oben).
 
 Smoke-Test: `https://api.example.org/api/health` muss `{"status":"ok",…}` liefern.
 
