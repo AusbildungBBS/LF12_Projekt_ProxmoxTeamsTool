@@ -2,6 +2,13 @@ import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { useRoleFlags } from "../auth/useRoleFlags";
 
+// Label des Rueckweg-Links zum jeweiligen Teams-Tab-Root (Pfad -> Anzeigename).
+const TEAMS_TAB_LABELS: Record<string, string> = {
+  "/": "Übersicht",
+  "/templates": "Templates",
+  "/my-vms": "Meine VMs",
+};
+
 export function Layout() {
   const { isAuthenticated, isInTeams, realIsAdmin, teamsTabRoot } = useAuth();
   const { isAdmin, isStaff } = useRoleFlags();
@@ -22,18 +29,21 @@ export function Layout() {
   const navStaff = isInTeams ? isStaff || realIsAdmin : isStaff;
   const navAdmin = isInTeams ? realIsAdmin : isAdmin;
 
-  // "Am Root des aktiven Teams-Tabs" — dort reicht die Teams-Tableiste, der
-  // App-Header waere redundant. Der aktive Tab kommt aus getContext (teamsTabRoot),
-  // NICHT aus dem Pfad: ein per Dashboard-Karte erreichtes /templates zaehlt so
-  // nicht als Tab-Root (aktiver Tab ist Proxmox) -> man strandet nicht.
-  const atTabRoot = isInTeams && pathname === (teamsTabRoot ?? "/");
-  // Uebersicht = Rueckweg zur Standardseite: Browser immer, in Teams nur abseits
-  // des aktiven Tab-Roots.
-  const showOverview = !isInTeams || !atTabRoot;
-  // Header nur anzeigen, wenn er ueberhaupt einen Button haette (Uebersicht ODER
+  // Root-Route + Label des AKTIVEN Teams-Tabs. Der aktive Tab kommt aus
+  // getContext (teamsTabRoot), NICHT aus dem Pfad: ein per Dashboard-Karte
+  // erreichtes /templates zaehlt so nicht als Tab-Root (aktiver Tab ist Proxmox)
+  // -> man strandet nicht.
+  const tabRoot = teamsTabRoot ?? "/";
+  const tabLabel = TEAMS_TAB_LABELS[tabRoot] ?? "Übersicht";
+  const atTabRoot = isInTeams && pathname === tabRoot;
+  // In Teams: Rueckweg-Link zum Root des AKTIVEN Tabs (z.B. "Templates"), sobald
+  // man nicht dort ist — NICHT stur "Übersicht"/Dashboard. Im Browser zeigt die
+  // volle Nav ohnehin alle Ziele.
+  const showReturnLink = isInTeams && !atTabRoot;
+  // Header nur anzeigen, wenn er ueberhaupt einen Button haette (Rueckweg ODER
   // Rollen-Nav). Sonst (leerer Header) ausblenden — inkl. Brand.
   const showHeader =
-    !isInTeams || (isAuthenticated && (showOverview || navStaff));
+    !isInTeams || (isAuthenticated && (showReturnLink || navStaff));
 
   return (
     <div className="app">
@@ -48,17 +58,19 @@ export function Layout() {
             </div>
             {isAuthenticated && (
               <nav className="app-nav">
-                {/* Uebersicht = Rueckweg zur Standardseite. Browser immer; in
-                    Teams nur abseits des aktiven Tab-Roots (sonst redundant zur
-                    Teams-Tableiste). Meine VMs/Templates haben eigene Teams-Tabs
-                    -> in Teams ausgeblendet. */}
-                {showOverview && (
-                  <NavLink to="/" end>
-                    Übersicht
-                  </NavLink>
-                )}
-                {!isInTeams && (
+                {/* In Teams: EIN Rueckweg-Link zum Root des aktiven Tabs (mit
+                    dessen Label), sichtbar sobald man nicht dort ist. Im Browser
+                    die volle Nav — in Teams haben Uebersicht/Meine VMs/Templates
+                    eigene Teams-Tabs. */}
+                {isInTeams ? (
+                  showReturnLink && (
+                    <NavLink to={tabRoot} end={tabRoot === "/"}>
+                      {tabLabel}
+                    </NavLink>
+                  )
+                ) : (
                   <>
+                    <NavLink to="/" end>Übersicht</NavLink>
                     <NavLink to="/my-vms">Meine VMs</NavLink>
                     <NavLink to="/templates">Templates</NavLink>
                   </>
