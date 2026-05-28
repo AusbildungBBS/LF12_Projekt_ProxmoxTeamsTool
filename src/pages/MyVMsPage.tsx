@@ -60,6 +60,9 @@ export function MyVMsPage() {
   const [vms, setVms] = useState<VmDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
+  // VMs, deren Löschung an Proxmox übergeben wurde (Task läuft async): bleiben mit
+  // "wird gelöscht …" sichtbar + werden eifrig gepollt, bis sie verschwinden.
+  const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
 
   // Frisch erstellte VM (von der Vorlagen-Seite weitergereicht): bis sie in der
   // Liste auftaucht, zeigen wir einen Platzhalter + pollen eifrig. Klon + das
@@ -83,7 +86,14 @@ export function MyVMsPage() {
   const refresh = useCallback(async () => {
     setError(null);
     try {
-      setVms(await api.listVms());
+      const list = await api.listVms();
+      setVms(list);
+      // "wird gelöscht"-Marker entfernen, sobald die VM wirklich weg ist.
+      const present = new Set(list.map((v) => v.vmid));
+      setDeletingIds((prev) => {
+        const next = new Set([...prev].filter((id) => present.has(id)));
+        return next.size === prev.size ? prev : next;
+      });
     } catch (e) {
       setError(errMsg(e));
     }
@@ -98,7 +108,9 @@ export function MyVMsPage() {
 
   // Auto-Refresh: läuft was oder steht ein Klon aus -> schnell (Live-Stats),
   // sonst ruhiger — aber immer, damit neue/gestoppte VMs ohne Reload auftauchen.
-  useVmAutoRefresh(vms, refresh, { eager: showPending });
+  useVmAutoRefresh(vms, refresh, {
+    eager: showPending || deletingIds.size > 0,
+  });
 
   // Abbruch-Deadline für den ausstehenden Klon: taucht die VM nicht auf, Hinweis
   // zeigen + Platzhalter beenden. setState nur im Timeout-Callback (nicht synchron
@@ -147,7 +159,22 @@ export function MyVMsPage() {
       if (action === "start") await api.startVm(vm.vmid);
       else if (action === "shutdown") await api.shutdownVm(vm.vmid);
       else if (action === "stop") await api.stopVm(vm.vmid);
-      else await api.deleteVm(vm.vmid);
+      else {
+        await api.deleteVm(vm.vmid);
+        // Löschen ist async (Proxmox-Task). VM als "wird gelöscht" markieren und
+        // den eager-Poll übernehmen lassen — refresh() entfernt den Marker, sobald
+        // sie verschwindet. Sicherheitsnetz: nach 60 s aufgeben (z.B. Task scheitert).
+        const id = vm.vmid;
+        setDeletingIds((prev) => new Set(prev).add(id));
+        setTimeout(() => {
+          setDeletingIds((prev) => {
+            if (!prev.has(id)) return prev;
+            const next = new Set(prev);
+            next.delete(id);
+            return next;
+          });
+        }, 60_000);
+      }
       await refresh();
     } catch (e) {
       setError(errMsg(e));
@@ -206,6 +233,9 @@ export function MyVMsPage() {
                 <strong>{v.name}</strong>
                 <span className="badge">VMID {v.vmid}</span>
                 <StatusBadge status={v.status} />
+                {deletingIds.has(v.vmid) && (
+                  <span className="badge">wird gelöscht …</span>
+                )}
               </div>
               <div className="card-meta">
                 {v.sourceTemplate && (
@@ -248,7 +278,11 @@ export function MyVMsPage() {
                   aria-label="Start"
                   title="Start"
                   data-tooltip="Starten"
-                  disabled={busyId === v.vmid || v.status === "running"}
+                  disabled={
+                    busyId === v.vmid ||
+                    deletingIds.has(v.vmid) ||
+                    v.status === "running"
+                  }
                   onClick={() => run(v, "start")}
                 >
                   ▶
@@ -258,7 +292,11 @@ export function MyVMsPage() {
                   aria-label="Herunterfahren"
                   title="Sauberes Herunterfahren (Guest-Agent)"
                   data-tooltip="Sauber herunterfahren"
-                  disabled={busyId === v.vmid || v.status !== "running"}
+                  disabled={
+                    busyId === v.vmid ||
+                    deletingIds.has(v.vmid) ||
+                    v.status !== "running"
+                  }
                   onClick={() => run(v, "shutdown")}
                 >
                   ⏻
@@ -268,7 +306,11 @@ export function MyVMsPage() {
                   aria-label="Stopp (hart)"
                   title="Hart stoppen — Strom trennen"
                   data-tooltip="Hart stoppen"
-                  disabled={busyId === v.vmid || v.status === "stopped"}
+                  disabled={
+                    busyId === v.vmid ||
+                    deletingIds.has(v.vmid) ||
+                    v.status === "stopped"
+                  }
                   onClick={() => run(v, "stop")}
                 >
                   ⏹
@@ -278,7 +320,11 @@ export function MyVMsPage() {
                   aria-label="Konsole"
                   title="VNC-Konsole öffnen"
                   data-tooltip="Konsole öffnen"
-                  disabled={busyId === v.vmid || v.status !== "running"}
+                  disabled={
+                    busyId === v.vmid ||
+                    deletingIds.has(v.vmid) ||
+                    v.status !== "running"
+                  }
                   onClick={() => openConsole(v)}
                 >
                   🖥
@@ -288,7 +334,7 @@ export function MyVMsPage() {
                   aria-label="Löschen"
                   title="Löschen"
                   data-tooltip="Löschen"
-                  disabled={busyId === v.vmid}
+                  disabled={busyId === v.vmid || deletingIds.has(v.vmid)}
                   onClick={() => run(v, "delete")}
                 >
                   🗑
