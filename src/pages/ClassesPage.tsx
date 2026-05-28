@@ -206,6 +206,9 @@ export function ClassesPage() {
             const tpls = templatesOf(c.oid);
             const cvms = vmsOf(c.oid);
             const runningCount = cvms.filter((v) => v.status === "running").length;
+            // Löschen geht nur, wenn ALLE VMs aus sind (Proxmox zerstört keine laufende VM).
+            const allStopped =
+              cvms.length > 0 && cvms.every((v) => v.status === "stopped");
             return (
               <li key={c.oid} className="card">
                 <div className="card-row">
@@ -314,10 +317,16 @@ export function ClassesPage() {
                       </button>
                       <button
                         className="icon-button danger"
-                        data-tooltip="Alle löschen"
-                        title="Alle löschen"
+                        data-tooltip={
+                          allStopped
+                            ? "Alle löschen"
+                            : "Erst alle herunterfahren — laufende VMs lassen sich nicht löschen"
+                        }
+                        title={
+                          allStopped ? "Alle löschen" : "Erst alle herunterfahren"
+                        }
                         aria-label="Alle löschen"
-                        disabled={busy === `${c.oid}:delete`}
+                        disabled={busy === `${c.oid}:delete` || !allStopped}
                         onClick={() => bulk(c.oid, "delete")}
                       >
                         🗑

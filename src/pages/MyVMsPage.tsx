@@ -324,9 +324,13 @@ export function MyVMsPage() {
                   <button
                     className="icon-button danger"
                     aria-label="Löschen"
-                    title="Löschen"
-                    data-tooltip="Löschen"
-                    disabled={busy}
+                    title={v.status === "stopped" ? "Löschen" : "Erst herunterfahren"}
+                    data-tooltip={
+                      v.status === "stopped"
+                        ? "Löschen"
+                        : "Erst herunterfahren — läuft noch"
+                    }
+                    disabled={busy || v.status !== "stopped"}
                     onClick={() => run(v, "delete")}
                   >
                     🗑
