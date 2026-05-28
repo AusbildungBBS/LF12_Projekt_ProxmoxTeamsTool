@@ -48,6 +48,14 @@ export function TemplatesPage() {
     }
   }, [accessToken, refresh, canManage, api]);
 
+  // Vorlagen periodisch frisch halten (z.B. wenn ein anderer Lehrer eine claimt
+  // oder Klassen/öffentlich ändert) — ohne manuellen Reload.
+  useEffect(() => {
+    if (!accessToken) return;
+    const id = setInterval(() => void refresh(), 15_000);
+    return () => clearInterval(id);
+  }, [accessToken, refresh]);
+
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
 
   async function withBusy<T>(vmid: number, op: () => Promise<T>) {
