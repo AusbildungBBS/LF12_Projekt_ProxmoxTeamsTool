@@ -15,6 +15,11 @@ import { ErrorCard } from "../components/ErrorCard";
 import { LoadingCard } from "../components/LoadingCard";
 import { EmptyCard } from "../components/EmptyCard";
 import { useVmAutoRefresh } from "../hooks/useVmAutoRefresh";
+import {
+  TRANSITION_LABEL,
+  pruneTransitions,
+  type TransitionAction,
+} from "../lib/vmTransitions";
 import { errMsg } from "../lib/errors";
 
 type BulkAction = "start" | "shutdown" | "stop" | "delete";
@@ -46,6 +51,10 @@ export function ClassesPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  // Laufende Übergänge pro VM (Bulk-Aktion) -> Pill + eager-Poll bis Zielzustand.
+  const [transitions, setTransitions] = useState<Map<number, TransitionAction>>(
+    new Map()
+  );
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -58,6 +67,7 @@ export function ClassesPage() {
       setClasses(c);
       setTemplates(t);
       setVms(v);
+      setTransitions((prev) => pruneTransitions(prev, v));
     } catch (e) {
       setError(errMsg(e));
     }
@@ -70,8 +80,9 @@ export function ClassesPage() {
     })();
   }, [accessToken, refresh]);
 
-  // Auto-Refresh für Live-Stats wenn was läuft.
-  useVmAutoRefresh(vms, refresh);
+  // Auto-Refresh: läuft was oder ist ein Übergang offen -> schnell; sonst ruhiger,
+  // aber immer (neue/gestoppte VMs ohne Reload).
+  useVmAutoRefresh(vms, refresh, { eager: transitions.size > 0 });
 
   if (!isAuthenticated) return <p>Bitte einloggen.</p>;
   if (!isStaff) {
@@ -130,6 +141,27 @@ export function ClassesPage() {
     };
     const results = await Promise.allSettled(
       targetVms.map((v) => callForAction(v.vmid))
+    );
+    // Übergänge für erfolgreich angestoßene VMs merken -> Pills + eager-Poll bis
+    // Zielzustand. Fehlgeschlagene Calls bekommen keinen falschen Übergangsmarker.
+    // refresh() räumt erledigte auf; Sicherheitsnetz nach 90 s pro VM.
+    const ids = targetVms
+      .filter((_, i) => results[i].status === "fulfilled")
+      .map((v) => v.vmid);
+    setTransitions((prev) => {
+      const next = new Map(prev);
+      for (const id of ids) next.set(id, action);
+      return next;
+    });
+    ids.forEach((id) =>
+      setTimeout(() => {
+        setTransitions((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 90_000)
     );
     const failed = results.filter((r) => r.status === "rejected");
     if (failed.length > 0) {
@@ -215,24 +247,32 @@ export function ClassesPage() {
                   <div className="card-edit">
                     <h4>VMs in dieser Klasse</h4>
                     <ul className="inline-list">
-                      {cvms.map((v) => (
-                        <li key={v.vmid}>
-                          <Link to={`/my-vms#vm-${v.vmid}`}>{v.name}</Link>{" "}
-                          <span className="muted">(VMID {v.vmid})</span>{" "}
-                          <StatusBadge status={v.status} />
-                          <VmStatsPill vm={v} />
-                          {v.status === "running" && (
-                            <Link
-                              to={`/vms/${v.vmid}/console`}
-                              title="Konsole öffnen"
-                              className="inline-icon-link"
-                              aria-label="Konsole öffnen"
-                            >
-                              🖥
-                            </Link>
-                          )}
-                        </li>
-                      ))}
+                      {cvms.map((v) => {
+                        const tx = transitions.get(v.vmid);
+                        return (
+                          <li key={v.vmid}>
+                            <Link to={`/my-vms#vm-${v.vmid}`}>{v.name}</Link>{" "}
+                            <span className="muted">(VMID {v.vmid})</span>{" "}
+                            <StatusBadge status={v.status} />
+                            {tx && (
+                              <span className="badge badge-busy">
+                                {TRANSITION_LABEL[tx]}
+                              </span>
+                            )}
+                            <VmStatsPill vm={v} />
+                            {v.status === "running" && (
+                              <Link
+                                to={`/vms/${v.vmid}/console`}
+                                title="Konsole öffnen"
+                                className="inline-icon-link"
+                                aria-label="Konsole öffnen"
+                              >
+                                🖥
+                              </Link>
+                            )}
+                          </li>
+                        );
+                      })}
                     </ul>
                     <div className="card-actions icon-actions">
                       <button

@@ -1218,3 +1218,21 @@ a:hover {
   color: #7a4500;
   letter-spacing: 0.04em;
 }
+
+/* Übergangs-Pill (startet …/fährt herunter …/wird gestoppt …/gelöscht …/erstellt …) */
+.badge.badge-busy {
+  background: #ffe4b5;
+  color: #7a4500;
+  animation: badge-busy-pulse 1.4s ease-in-out infinite;
+}
+[data-theme="dark"] .badge.badge-busy {
+  background: #3d2a16;
+  color: #e0a866;
+}
+@keyframes badge-busy-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .badge.badge-busy { animation: none; }
+}

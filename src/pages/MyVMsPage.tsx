@@ -11,6 +11,11 @@ import { EmptyCard } from "../components/EmptyCard";
 import { useVmAutoRefresh } from "../hooks/useVmAutoRefresh";
 import { errMsg } from "../lib/errors";
 import { bytesToMb } from "../lib/format";
+import {
+  TRANSITION_LABEL,
+  pruneTransitions,
+  type TransitionAction,
+} from "../lib/vmTransitions";
 
 function formatUptime(seconds: number): string {
   if (seconds < 60) return `${seconds}s`;
@@ -60,9 +65,12 @@ export function MyVMsPage() {
   const [vms, setVms] = useState<VmDTO[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
-  // VMs, deren Löschung an Proxmox übergeben wurde (Task läuft async): bleiben mit
-  // "wird gelöscht …" sichtbar + werden eifrig gepollt, bis sie verschwinden.
-  const [deletingIds, setDeletingIds] = useState<Set<number>>(new Set());
+  // Laufende Übergänge pro VM (Start/Shutdown/Stop/Löschen). Steuert die
+  // Übergangs-Pill, das Deaktivieren der Buttons und den eager-Poll, bis der
+  // Zielzustand erreicht ist. refresh() räumt erledigte Einträge auf.
+  const [transitions, setTransitions] = useState<Map<number, TransitionAction>>(
+    new Map()
+  );
 
   // Frisch erstellte VM (von der Vorlagen-Seite weitergereicht): bis sie in der
   // Liste auftaucht, zeigen wir einen Platzhalter + pollen eifrig. Klon + das
@@ -88,12 +96,8 @@ export function MyVMsPage() {
     try {
       const list = await api.listVms();
       setVms(list);
-      // "wird gelöscht"-Marker entfernen, sobald die VM wirklich weg ist.
-      const present = new Set(list.map((v) => v.vmid));
-      setDeletingIds((prev) => {
-        const next = new Set([...prev].filter((id) => present.has(id)));
-        return next.size === prev.size ? prev : next;
-      });
+      // Erledigte Übergänge aufräumen (Zielzustand erreicht / VM verschwunden).
+      setTransitions((prev) => pruneTransitions(prev, list));
     } catch (e) {
       setError(errMsg(e));
     }
@@ -106,10 +110,11 @@ export function MyVMsPage() {
     })();
   }, [accessToken, refresh]);
 
-  // Auto-Refresh: läuft was oder steht ein Klon aus -> schnell (Live-Stats),
-  // sonst ruhiger — aber immer, damit neue/gestoppte VMs ohne Reload auftauchen.
+  // Auto-Refresh: läuft was, steht ein Klon aus oder ist ein Übergang offen ->
+  // schnell; sonst ruhiger — aber immer, damit neue/gestoppte VMs ohne Reload
+  // auftauchen.
   useVmAutoRefresh(vms, refresh, {
-    eager: showPending || deletingIds.size > 0,
+    eager: showPending || transitions.size > 0,
   });
 
   // Abbruch-Deadline für den ausstehenden Klon: taucht die VM nicht auf, Hinweis
@@ -159,22 +164,20 @@ export function MyVMsPage() {
       if (action === "start") await api.startVm(vm.vmid);
       else if (action === "shutdown") await api.shutdownVm(vm.vmid);
       else if (action === "stop") await api.stopVm(vm.vmid);
-      else {
-        await api.deleteVm(vm.vmid);
-        // Löschen ist async (Proxmox-Task). VM als "wird gelöscht" markieren und
-        // den eager-Poll übernehmen lassen — refresh() entfernt den Marker, sobald
-        // sie verschwindet. Sicherheitsnetz: nach 60 s aufgeben (z.B. Task scheitert).
-        const id = vm.vmid;
-        setDeletingIds((prev) => new Set(prev).add(id));
-        setTimeout(() => {
-          setDeletingIds((prev) => {
-            if (!prev.has(id)) return prev;
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
-        }, 60_000);
-      }
+      else await api.deleteVm(vm.vmid);
+      // Übergang merken -> Pill ("startet …"/"wird gelöscht …") + eager-Poll, bis
+      // der Zielzustand (running/stopped) bzw. das Verschwinden eintritt. refresh()
+      // räumt den Marker auf; Sicherheitsnetz nach 90 s, falls der Task scheitert.
+      const id = vm.vmid;
+      setTransitions((prev) => new Map(prev).set(id, action));
+      setTimeout(() => {
+        setTransitions((prev) => {
+          if (!prev.has(id)) return prev;
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        });
+      }, 90_000);
       await refresh();
     } catch (e) {
       setError(errMsg(e));
@@ -205,7 +208,7 @@ export function MyVMsPage() {
           <div className="card-row">
             <strong>{pendingName ?? `VM ${pendingVmid}`}</strong>
             <span className="badge">VMID {pendingVmid}</span>
-            <span className="badge">wird erstellt …</span>
+            <span className="badge badge-busy">wird erstellt …</span>
           </div>
           <p className="muted">
             Klon läuft und wird konfiguriert — die VM erscheint gleich automatisch.
@@ -227,121 +230,111 @@ export function MyVMsPage() {
 
       {vms && vms.length > 0 && (
         <ul className="card-list">
-          {vms.map((v) => (
-            <li key={v.vmid} id={`vm-${v.vmid}`} className="card">
-              <div className="card-row">
-                <strong>{v.name}</strong>
-                <span className="badge">VMID {v.vmid}</span>
-                <StatusBadge status={v.status} />
-                {deletingIds.has(v.vmid) && (
-                  <span className="badge">wird gelöscht …</span>
-                )}
-              </div>
-              <div className="card-meta">
-                {v.sourceTemplate && (
-                  <span>
-                    aus Vorlage{" "}
-                    <Link to={`/templates#template-${v.sourceTemplate.vmid}`}>
-                      {v.sourceTemplate.name ?? `VMID ${v.sourceTemplate.vmid}`}
-                    </Link>
-                  </span>
-                )}
-                <span>{v.cpus ?? "?"} vCPU</span>
-                <span>{v.maxmem ? bytesToMb(v.maxmem) + " MB" : "? MB"}</span>
-                <span>Knoten {v.node}</span>
-                {v.uptime !== undefined && v.uptime > 0 && (
-                  <span title="Laufzeit seit letztem Start">
-                    ⏱ {formatUptime(v.uptime)}
-                  </span>
-                )}
-              </div>
-              {v.status === "running" && (
-                <div className="vm-stats">
-                  <Gauge
-                    label="CPU"
-                    value={(v.cpu ?? 0) * 100}
-                    max={100}
-                    suffix="%"
-                  />
-                  <Gauge
-                    label="RAM"
-                    value={v.mem ? v.mem / 1024 / 1024 : 0}
-                    max={v.maxmem ? v.maxmem / 1024 / 1024 : 0}
-                    suffix=" MB"
-                    fraction
-                  />
+          {vms.map((v) => {
+            const tx = transitions.get(v.vmid);
+            const busy = busyId === v.vmid || tx != null;
+            return (
+              <li key={v.vmid} id={`vm-${v.vmid}`} className="card">
+                <div className="card-row">
+                  <strong>{v.name}</strong>
+                  <span className="badge">VMID {v.vmid}</span>
+                  <StatusBadge status={v.status} />
+                  {tx && (
+                    <span className="badge badge-busy">
+                      {TRANSITION_LABEL[tx]}
+                    </span>
+                  )}
                 </div>
-              )}
-              <div className="card-actions icon-actions">
-                <button
-                  className="icon-button"
-                  aria-label="Start"
-                  title="Start"
-                  data-tooltip="Starten"
-                  disabled={
-                    busyId === v.vmid ||
-                    deletingIds.has(v.vmid) ||
-                    v.status === "running"
-                  }
-                  onClick={() => run(v, "start")}
-                >
-                  ▶
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label="Herunterfahren"
-                  title="Sauberes Herunterfahren (Guest-Agent)"
-                  data-tooltip="Sauber herunterfahren"
-                  disabled={
-                    busyId === v.vmid ||
-                    deletingIds.has(v.vmid) ||
-                    v.status !== "running"
-                  }
-                  onClick={() => run(v, "shutdown")}
-                >
-                  ⏻
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label="Stopp (hart)"
-                  title="Hart stoppen — Strom trennen"
-                  data-tooltip="Hart stoppen"
-                  disabled={
-                    busyId === v.vmid ||
-                    deletingIds.has(v.vmid) ||
-                    v.status === "stopped"
-                  }
-                  onClick={() => run(v, "stop")}
-                >
-                  ⏹
-                </button>
-                <button
-                  className="icon-button"
-                  aria-label="Konsole"
-                  title="VNC-Konsole öffnen"
-                  data-tooltip="Konsole öffnen"
-                  disabled={
-                    busyId === v.vmid ||
-                    deletingIds.has(v.vmid) ||
-                    v.status !== "running"
-                  }
-                  onClick={() => openConsole(v)}
-                >
-                  🖥
-                </button>
-                <button
-                  className="icon-button danger"
-                  aria-label="Löschen"
-                  title="Löschen"
-                  data-tooltip="Löschen"
-                  disabled={busyId === v.vmid || deletingIds.has(v.vmid)}
-                  onClick={() => run(v, "delete")}
-                >
-                  🗑
-                </button>
-              </div>
-            </li>
-          ))}
+                <div className="card-meta">
+                  {v.sourceTemplate && (
+                    <span>
+                      aus Vorlage{" "}
+                      <Link to={`/templates#template-${v.sourceTemplate.vmid}`}>
+                        {v.sourceTemplate.name ?? `VMID ${v.sourceTemplate.vmid}`}
+                      </Link>
+                    </span>
+                  )}
+                  <span>{v.cpus ?? "?"} vCPU</span>
+                  <span>{v.maxmem ? bytesToMb(v.maxmem) + " MB" : "? MB"}</span>
+                  <span>Knoten {v.node}</span>
+                  {v.uptime !== undefined && v.uptime > 0 && (
+                    <span title="Laufzeit seit letztem Start">
+                      ⏱ {formatUptime(v.uptime)}
+                    </span>
+                  )}
+                </div>
+                {v.status === "running" && (
+                  <div className="vm-stats">
+                    <Gauge
+                      label="CPU"
+                      value={(v.cpu ?? 0) * 100}
+                      max={100}
+                      suffix="%"
+                    />
+                    <Gauge
+                      label="RAM"
+                      value={v.mem ? v.mem / 1024 / 1024 : 0}
+                      max={v.maxmem ? v.maxmem / 1024 / 1024 : 0}
+                      suffix=" MB"
+                      fraction
+                    />
+                  </div>
+                )}
+                <div className="card-actions icon-actions">
+                  <button
+                    className="icon-button"
+                    aria-label="Start"
+                    title="Start"
+                    data-tooltip="Starten"
+                    disabled={busy || v.status === "running"}
+                    onClick={() => run(v, "start")}
+                  >
+                    ▶
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Herunterfahren"
+                    title="Sauberes Herunterfahren (Guest-Agent)"
+                    data-tooltip="Sauber herunterfahren"
+                    disabled={busy || v.status !== "running"}
+                    onClick={() => run(v, "shutdown")}
+                  >
+                    ⏻
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Stopp (hart)"
+                    title="Hart stoppen — Strom trennen"
+                    data-tooltip="Hart stoppen"
+                    disabled={busy || v.status === "stopped"}
+                    onClick={() => run(v, "stop")}
+                  >
+                    ⏹
+                  </button>
+                  <button
+                    className="icon-button"
+                    aria-label="Konsole"
+                    title="VNC-Konsole öffnen"
+                    data-tooltip="Konsole öffnen"
+                    disabled={busy || v.status !== "running"}
+                    onClick={() => openConsole(v)}
+                  >
+                    🖥
+                  </button>
+                  <button
+                    className="icon-button danger"
+                    aria-label="Löschen"
+                    title="Löschen"
+                    data-tooltip="Löschen"
+                    disabled={busy}
+                    onClick={() => run(v, "delete")}
+                  >
+                    🗑
+                  </button>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
