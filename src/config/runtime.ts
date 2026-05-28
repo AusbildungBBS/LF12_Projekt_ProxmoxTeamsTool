@@ -59,11 +59,20 @@ export const AZURE_APP_ID_URI = (
 //   gesetzt -> z.B. https://api.example.org: Frontend und Bridge liegen auf
 //              verschiedenen Origins (Azure Static Web Apps + Cloudflare-Tunnel).
 //              Erfordert CORS_ALLOWED_ORIGINS auf der Bridge.
-export const API_BASE_URL = (
-  runtimeConfig.API_BASE_URL ||
-  import.meta.env.VITE_API_BASE_URL ||
-  ""
-).replace(/\/+$/, ""); // Trailing-Slashes weg; "" bleibt "".
+function normalizeApiBase(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, ""); // Trailing-Slashes weg; "" bleibt "".
+  if (!trimmed) return "";
+  // Ohne Schema ist der Wert KEIN absolutes Origin, sondern ein relativer Pfad:
+  // fetch haengt ihn an die Frontend-Origin (.../api.example.org/api/me) und
+  // `new URL(...)` in wsUrl() wirft. Fehlt das Schema, https:// annehmen (Prod
+  // laeuft ueber TLS).
+  if (!/^https?:\/\//i.test(trimmed)) return `https://${trimmed}`;
+  return trimmed;
+}
+
+export const API_BASE_URL = normalizeApiBase(
+  runtimeConfig.API_BASE_URL || import.meta.env.VITE_API_BASE_URL || ""
+);
 
 // Baut die HTTP-URL fuer einen API-Pfad. `path` ist ein absoluter App-Pfad wie
 // "/api/templates". Bei leerer Basis bleibt der Pfad relativ (same-origin).
