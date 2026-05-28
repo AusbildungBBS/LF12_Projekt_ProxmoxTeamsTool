@@ -152,7 +152,7 @@ export function HomePage() {
 
           <div className="card">
             <h3>
-              Aktive Klassen ({classes?.length ?? "—"}){" "}
+              Aktive Klassen ({classes?.length ?? 0}){" "}
               <Link to="/classes" className="card-section-link">
                 verwalten →
               </Link>
@@ -174,7 +174,7 @@ export function HomePage() {
       {isTeacher && !isAdmin && (
         <>
           <Link to="/classes" className="card card-link">
-            <h3>Klassen ({classes?.length ?? "—"})</h3>
+            <h3>Klassen ({classes?.length ?? 0})</h3>
             {classes && classes.length > 0 ? (
               <ul className="home-inline">
                 {classes.map((c) => (
@@ -215,7 +215,7 @@ export function HomePage() {
       {isStudent && !isAdmin && !isTeacher && (
         <>
           <Link to="/classes" className="card card-link">
-            <h3>Deine Klassen ({classes?.length ?? "—"})</h3>
+            <h3>Deine Klassen ({classes?.length ?? 0})</h3>
             {classes && classes.length > 0 ? (
               <ul className="home-inline">
                 {classes.map((c) => (
