@@ -10,6 +10,7 @@ import { msalConfig, loginRequest } from "../config/authConfig";
 import { apiUrl } from "../config/runtime";
 import { AuthContext } from "./authContext";
 import type {
+  AuthSession,
   GraphProfile,
   BridgeIdentity,
   ImpersonatedRole,
@@ -44,12 +45,19 @@ function bridgeAuthErrorMessage(status: number, code?: string): string {
   return "Anmeldung konnte nicht abgeschlossen werden. Bitte später erneut versuchen.";
 }
 
+// Relevante Claims aus einem ID-/Access-Token. MSAL liefert sie im Browser
+// geparst (user.idTokenClaims); in Teams dekodieren wir sie selbst.
+type JwtClaims = {
+  name?: string;
+  preferred_username?: string;
+  roles?: string[];
+  oid?: string;
+};
+
 // Dekodiert den Payload eines JWT (ohne Signaturpruefung) — NUR zur Anzeige von
 // Name/Rollen in Teams (dort gibt es kein MSAL-ID-Token). Sicherheit und
 // Autorisierung macht weiterhin die Bridge serverseitig.
-function decodeJwtPayload(
-  token: string | null
-): { name?: string; preferred_username?: string; roles?: string[] } | null {
+function decodeJwtPayload(token: string | null): JwtClaims | null {
   if (!token) return null;
   const part = token.split(".")[1];
   if (!part) return null;
@@ -99,47 +107,67 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   };
 
   const user = accounts[0] ?? null;
-  // Im Browser kommt der Login via MSAL -> accounts[0] ist gesetzt. In Teams
-  // liefert Teams-SSO (authentication.getAuthToken) nur einen accessToken und
-  // fuellt accounts[] NIE — wir gelten dort als angemeldet, sobald das Token da
-  // ist. Sonst bliebe der Teams-Tab dauerhaft im Login-Screen haengen.
-  const isAuthenticated = !!user || (isInTeams && !!accessToken);
 
-  // In Teams (kein MSAL-ID-Token) dekodieren wir den SSO-Access-Token NUR zur
-  // Anzeige von Rollen/Name — die Autorisierung macht weiterhin die Bridge.
-  const ssoClaims = useMemo(
-    () => (isInTeams ? decodeJwtPayload(accessToken) : null),
-    [isInTeams, accessToken]
-  );
+  // ── EINE normalisierte Session, egal woher der Login kam ───────────────────
+  // Zwei Erwerbs-/Refresh-Wege (MSAL im Browser, Teams-SSO im Tab — siehe
+  // getToken()), aber genau EIN normalisiertes Identitaets-Objekt, mit dem der
+  // Rest arbeitet. Die Bridge-Identity (/api/me) ist autoritativ und reichert
+  // dieses an bzw. ueberschreibt es.
+  const session: AuthSession | null = useMemo(() => {
+    // Browser: das MSAL-Konto ist die Quelle der Wahrheit fuer "angemeldet" —
+    // auch schon, bevor das accessToken still nachgeladen wurde.
+    if (user) {
+      const c = user.idTokenClaims as JwtClaims | undefined;
+      return {
+        source: "msal",
+        accessToken: accessToken ?? "",
+        oid: c?.oid ?? "",
+        displayName: c?.name || c?.preferred_username || user.username || "",
+        email: c?.preferred_username || user.username || "",
+        roles: c?.roles ?? [],
+      };
+    }
+    // Teams: kein MSAL-Konto — das SSO-Token (+ Teams-Kontext) ist die Quelle.
+    if (isInTeams && accessToken) {
+      const c = decodeJwtPayload(accessToken);
+      return {
+        source: "teams",
+        accessToken,
+        oid: c?.oid ?? "",
+        displayName:
+          c?.name ||
+          teamsUser?.displayName ||
+          c?.preferred_username ||
+          teamsUser?.upn ||
+          "",
+        email: teamsUser?.upn || c?.preferred_username || "",
+        roles: c?.roles ?? [],
+      };
+    }
+    return null;
+  }, [user, accessToken, isInTeams, teamsUser]);
 
-  // Echte Roles aus ID-Token bzw. (in Teams) aus dem SSO-Token, damit das
-  // Switcher-UI in der Profile-Bar erkennt ob der User wirklich Admin ist.
-  const idTokenRoles =
-    (user?.idTokenClaims as { roles?: string[] } | undefined)?.roles ??
-    ssoClaims?.roles ??
-    [];
-  const realRoles = identity?.roles ?? idTokenRoles;
+  const isAuthenticated = !!session;
+
+  // Rollen: Bridge-Identity autoritativ, sonst aus der normalisierten Session.
+  // realRoles = die ECHTEN Rollen (ohne Impersonation), damit der Switcher
+  // erkennt, ob der User wirklich Admin ist.
+  const realRoles = identity?.roles ?? session?.roles ?? [];
   const realIsAdmin = realRoles.includes(ROLES.ADMIN);
 
-  // Anzeige-Profil-Fallback fuer Teams ohne Bridge (rein abgeleitet, kein
-  // State): Name/UPN aus Teams-Kontext bzw. SSO-Token. Das echte Graph-Profil
-  // (state `profile`, von /api/me) hat im Context-Value Vorrang.
-  const teamsFallbackProfile = useMemo<GraphProfile | null>(() => {
-    if (!isInTeams) return null;
-    const displayName =
-      ssoClaims?.name ||
-      teamsUser?.displayName ||
-      ssoClaims?.preferred_username ||
-      teamsUser?.upn;
-    const upn = teamsUser?.upn || ssoClaims?.preferred_username;
-    if (!displayName && !upn) return null;
-    return {
-      id: "",
-      displayName: displayName || upn || "",
-      mail: upn ?? null,
-      userPrincipalName: upn ?? "",
-    };
-  }, [isInTeams, ssoClaims, teamsUser]);
+  // Anzeige-Profil: echtes Graph-Profil (Bridge, state `profile`) hat Vorrang,
+  // sonst das aus der Session abgeleitete Minimal-Profil (greift v.a. in Teams
+  // ohne Bridge — und im Browser vor dem /api/me-Roundtrip).
+  const effectiveProfile: GraphProfile | null =
+    profile ??
+    (session
+      ? {
+          id: session.oid,
+          displayName: session.displayName || session.email,
+          mail: session.email || null,
+          userPrincipalName: session.email,
+        }
+      : null);
 
   // Die "gefuehlten" Roles fuer die UI: bei aktiver Impersonation ueberschrieben.
   const roles = impersonatedRole ? [impersonatedRole] : realRoles;
@@ -360,7 +388,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         isAuthenticated,
         user,
         accessToken,
-        profile: profile ?? teamsFallbackProfile,
+        profile: effectiveProfile,
         identity,
         roles,
         classes,

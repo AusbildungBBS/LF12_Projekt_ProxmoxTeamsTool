@@ -29,6 +29,19 @@ export interface BridgeIdentity {
   source: "standard" | "edu";
 }
 
+// Normalisierte Auth-Session: EIN Identitaets-Objekt, egal ob der Login via
+// MSAL (Browser) oder Teams-SSO (Tab) kam. Der Provider baut es aus den
+// jeweiligen Claims; die Bridge-Identity (oben) ist autoritativ und reichert es
+// an. Bewusst minimal — nur was die UI auch OHNE Bridge braucht.
+export interface AuthSession {
+  source: "msal" | "teams";
+  accessToken: string;
+  oid: string;
+  displayName: string;
+  email: string;
+  roles: string[];
+}
+
 export interface AuthContextType {
   isInTeams: boolean;
   isAuthenticated: boolean;
