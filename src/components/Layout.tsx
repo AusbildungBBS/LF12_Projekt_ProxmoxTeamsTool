@@ -1,6 +1,7 @@
 import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../auth/authContext";
 import { useRoleFlags } from "../auth/useRoleFlags";
+import { ErrorCard } from "./ErrorCard";
 
 // Label des Rueckweg-Links zum jeweiligen Teams-Tab-Root (Pfad -> Anzeigename).
 const TEAMS_TAB_LABELS: Record<string, string> = {
@@ -10,7 +11,8 @@ const TEAMS_TAB_LABELS: Record<string, string> = {
 };
 
 export function Layout() {
-  const { isAuthenticated, isInTeams, realIsAdmin, teamsTabRoot } = useAuth();
+  const { isAuthenticated, isInTeams, realIsAdmin, teamsTabRoot, error } =
+    useAuth();
   const { isAdmin, isStaff } = useRoleFlags();
   const { pathname } = useLocation();
 
@@ -84,6 +86,11 @@ export function Layout() {
       )}
 
       <main className="app-main">
+        {/* Auth-/Bridge-Fehler global (auf JEDER Seite) anzeigen — nicht nur auf
+            dem Dashboard. Greift im angemeldeten Zustand (dort entstehen
+            Bridge-/Berechtigungsfehler); Login-Fehler zeigt der Willkommens-
+            Screen. Meldungen sind bereits fertig formuliert -> prefix="". */}
+        {isAuthenticated && <ErrorCard message={error} prefix="" />}
         <Outlet />
       </main>
     </div>

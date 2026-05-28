@@ -76,8 +76,7 @@ export function HomePage() {
     <>
       <UserProfile />
 
-      <ErrorCard message={authError} prefix="" />
-
+      {/* Auth-/Bridge-Fehler werden jetzt global im Layout angezeigt. */}
       {isAuthenticated && !hasAnyRole && !authError && (
         <div className="card warning">
           <h3>Keine Rolle zugewiesen</h3>
