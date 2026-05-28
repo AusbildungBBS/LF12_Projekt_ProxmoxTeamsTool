@@ -17,14 +17,16 @@ val() {
 
 CID="$(val AZURE_CLIENT_ID)"
 TID="$(val AZURE_TENANT_ID)"
+AID="$(val AZURE_APP_ID_URI)"
 API="$(val API_BASE_URL)"
 
 cat > /usr/share/nginx/html/config.js <<EOF
 window.__APP_CONFIG__ = {
   AZURE_CLIENT_ID: "${CID}",
   AZURE_TENANT_ID: "${TID}",
+  AZURE_APP_ID_URI: "${AID}",
   API_BASE_URL: "${API}"
 };
 EOF
 
-echo "[frontend] /config.js generiert (client=${CID:+gesetzt} tenant=${TID:+gesetzt} api=${API:-<same-origin>})"
+echo "[frontend] /config.js generiert (client=${CID:+gesetzt} tenant=${TID:+gesetzt} appIdUri=${AID:-<auto>} api=${API:-<same-origin>})"

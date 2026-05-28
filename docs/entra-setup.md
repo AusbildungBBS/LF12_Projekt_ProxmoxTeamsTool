@@ -2,7 +2,7 @@
 
 Ohne diese Schritte funktioniert kein Login. Das Frontend holt via MSAL ein Access-Token für die Bridge-API, die Bridge validiert die `aud` dieses Tokens — beide Seiten erwarten, dass im Tenant eine App-Registration mit einer bestimmten Application ID URI und einem `access_as_user`-Scope existiert. Die App-Registration selbst wird einmalig pro Tenant angelegt; die Client-/Tenant-IDs landen anschließend in der `.env`.
 
-> Die Anleitung beschreibt den Stand für lokale Entwicklung (`http://localhost:5173`). Für Produktion zusätzlich die echte Redirect-URI eintragen.
+> Die Anleitung beschreibt den Stand für lokale Entwicklung (`http://localhost:5173`) und Teams-/SWA-Betrieb. Für Teams-SSO muss die Application ID URI den Frontend-Host enthalten.
 
 > **Single-Tenant ist Pflicht.** Die Bridge ist bewusst auf **einen** Tenant festgenagelt: `AZURE_TENANT_ID` muss die konkrete **Directory-(Tenant-)GUID** sein. Fehlt sie oder steht dort eine Multi-Tenant-Authority (`common` / `organizations` / `consumers`), **startet die Bridge nicht** (harter Abbruch beim Boot). Zusätzlich prüft die Bridge bei jedem Token den `tid`-Claim gegen diese GUID. Ein Konto aus einer fremden Organisation bekommt so `401 Invalid token` bzw. `403` mit `code: wrong_tenant` — siehe [bridge/index.ts](../bridge/index.ts).
 
@@ -51,11 +51,23 @@ GET https://graph.microsoft.com/v1.0/education/me
 
 ## 2. „Expose an API" konfigurieren
 
-Das ist der Schritt, an dem AAD sonst mit `AADSTS500011: The resource principal named api://<client-id> was not found in the tenant` abbricht.
+Das ist der Schritt, an dem AAD sonst mit `AADSTS500011: The resource principal named ... was not found in the tenant` abbricht.
 
 1. Linke Sidebar → **Expose an API**
 2. Neben „Application ID URI" → **Set**
-3. Den Default-Vorschlag `api://<client-id>` bestätigen (kein Host, kein Pfad davor).
+3. Für Teams-/SWA-Betrieb den Wert auf das Frontend mappen:
+
+   ```txt
+   api://<frontend-host>/<client-id>
+   ```
+
+   Beispiel:
+
+   ```txt
+   api://lively-stone-0d50e8810.7.azurestaticapps.net/05e8c4d6-e619-4c4f-8cab-13393345c5c2
+   ```
+
+   Für rein lokale Browser-Entwicklung ohne Teams geht auch `api://<client-id>`, aber Teams-SSO (`authentication.getAuthToken()`) braucht den Host.
 4. **Add a scope:**
    - Scope name: `access_as_user`
    - Who can consent: *Admins and users*
@@ -64,7 +76,7 @@ Das ist der Schritt, an dem AAD sonst mit `AADSTS500011: The resource principal 
    - State: **Enabled**
 5. Speichern.
 
-Im Frontend ([src/config/authConfig.ts](../src/config/authConfig.ts)) wird genau dieser Scope (`api://<client-id>/access_as_user`) angefragt; die Bridge ([bridge/index.ts](../bridge/index.ts)) erwartet entsprechend `aud == api://<client-id>` (override mit `API_AUDIENCE` möglich).
+Im Frontend ([src/config/authConfig.ts](../src/config/authConfig.ts)) wird genau dieser Scope (`<application-id-uri>/access_as_user`) angefragt. Die Bridge ([bridge/index.ts](../bridge/index.ts)) validiert `aud`; bei hostbasierter Teams-SSO-URI daher `API_AUDIENCE=<application-id-uri>` setzen.
 
 ## 2a. Access-Token-Version auf v2 stellen
 
@@ -126,19 +138,22 @@ Aus den oben gesammelten Werten:
 ```env
 VITE_AZURE_CLIENT_ID=<application-client-id>
 VITE_AZURE_TENANT_ID=<directory-tenant-id>
+VITE_AZURE_APP_ID_URI=api://<frontend-host>/<application-client-id>
 
 AZURE_CLIENT_ID=<application-client-id>
 AZURE_TENANT_ID=<directory-tenant-id>
+AZURE_APP_ID_URI=api://<frontend-host>/<application-client-id>
+API_AUDIENCE=api://<frontend-host>/<application-client-id>
 AZURE_CLIENT_SECRET=<secret-value-aus-schritt-6>
 ```
 
-`API_AUDIENCE` nur setzen, wenn die Application ID URI bewusst von `api://<client-id>` abweicht.
+`VITE_AZURE_APP_ID_URI` ist bei gehosteten Frontends optional, weil die SPA aus dem aktuellen Host denselben Default ableitet. Explizit setzen ist trotzdem sauberer, besonders bei Custom Domains. `API_AUDIENCE` auf der Bridge muss exakt derselbe Wert sein.
 
 ## Smoke-Test
 
 `npm run dev`, `http://localhost:5173` aufrufen, „Mit Microsoft anmelden" klicken.
 
-- **Klappt's:** Frontend hat ein Access-Token mit `aud=api://<client-id>` und den App-Roles im `roles`-Claim. Bridge-Endpoints sollten unter `Authorization: Bearer …` antworten.
+- **Klappt's:** Frontend hat ein Access-Token mit `aud=<application-id-uri>` und den App-Roles im `roles`-Claim. Bridge-Endpoints sollten unter `Authorization: Bearer …` antworten.
 - **`AADSTS500011`:** Schritt 2 (Expose an API) wurde nicht oder falsch durchgeführt.
 - **`AADSTS65005: scope … does not exist`:** Application ID URI ist gesetzt, aber unter „Expose an API" wurde noch kein `access_as_user`-Scope angelegt.
 - **`AADSTS65001` / Consent-Prompt taucht jedesmal auf:** Schritt 5 (Admin Consent) fehlt.

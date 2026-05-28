@@ -12,6 +12,7 @@ declare global {
     __APP_CONFIG__?: {
       AZURE_CLIENT_ID?: string;
       AZURE_TENANT_ID?: string;
+      AZURE_APP_ID_URI?: string;
       API_BASE_URL?: string;
     };
   }
@@ -27,6 +28,30 @@ export const AZURE_TENANT_ID =
   runtimeConfig.AZURE_TENANT_ID ||
   import.meta.env.VITE_AZURE_TENANT_ID ||
   "common";
+
+function defaultAppIdUri(): string {
+  if (!AZURE_CLIENT_ID) return "";
+
+  if (typeof window === "undefined") {
+    return `api://${AZURE_CLIENT_ID}`;
+  }
+
+  const host = window.location.host;
+  const isLocalhost =
+    host.startsWith("localhost") || host.startsWith("127.0.0.1");
+
+  // Teams SSO erwartet bei gehosteten Tabs api://<frontend-host>/<client-id>.
+  // Fuer lokale Browser-Entwicklung bleibt der alte Default ohne Host nutzbar.
+  return isLocalhost
+    ? `api://${AZURE_CLIENT_ID}`
+    : `api://${host}/${AZURE_CLIENT_ID}`;
+}
+
+export const AZURE_APP_ID_URI = (
+  runtimeConfig.AZURE_APP_ID_URI ||
+  import.meta.env.VITE_AZURE_APP_ID_URI ||
+  defaultAppIdUri()
+).replace(/\/+$/, "");
 
 // Absolute Basis-Origin der Bridge (API + VNC-WebSocket).
 //   leer    -> relative Pfade (/api, /ws): Frontend und Bridge teilen sich eine

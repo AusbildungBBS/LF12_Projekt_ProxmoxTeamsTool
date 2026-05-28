@@ -40,7 +40,7 @@ Das ist der größte Brocken und einmalig pro Tenant. Detaillierte Schritte: **[
 Kurzliste, was am Ende existieren muss:
 
 - [ ] App-Registration mit **SPA-Redirect-URI** `http://localhost:5173`
-- [ ] **Application ID URI** = `api://<client-id>` (sonst `AADSTS500011`)
+- [ ] **Application ID URI** = `api://<frontend-host>/<client-id>` für Teams/SWA oder `api://<client-id>` für rein lokale Browser-Dev (sonst `AADSTS500011`)
 - [ ] **Scope** `access_as_user` exposed (sonst `AADSTS65005`)
 - [ ] **Manifest** `requestedAccessTokenVersion: 2` (sonst lehnt die Bridge das Token mit `jwt issuer invalid` ab)
 - [ ] **App Roles** `Proxmox.Admin`, `Proxmox.Teacher`, `Proxmox.Student` angelegt
@@ -62,13 +62,18 @@ Mindestens diese Werte:
 ```env
 VITE_AZURE_CLIENT_ID=<application-client-id>
 VITE_AZURE_TENANT_ID=<directory-tenant-id>
+# Fuer Teams/SWA:
+# VITE_AZURE_APP_ID_URI=api://<frontend-host>/<application-client-id>
 
 AZURE_CLIENT_ID=<application-client-id>
 AZURE_TENANT_ID=<directory-tenant-id>
+# Fuer Teams/SWA denselben Wert wie die Application ID URI setzen:
+# AZURE_APP_ID_URI=api://<frontend-host>/<application-client-id>
+# API_AUDIENCE=api://<frontend-host>/<application-client-id>
 AZURE_CLIENT_SECRET=<secret-value>
 ```
 
-`PORT` (Bridge) und `API_AUDIENCE` nur überschreiben, wenn man bewusst von den Defaults abweicht. Die Proxmox-Variablen können leer bleiben, solange `RealProxmoxClient` noch nicht dran ist.
+`PORT` (Bridge) nur überschreiben, wenn man bewusst von den Defaults abweicht. `API_AUDIENCE` ist nötig, sobald die Application ID URI hostbasiert ist. Die Proxmox-Variablen können leer bleiben, solange `RealProxmoxClient` noch nicht dran ist.
 
 > `.env` ist gitignored, `.env.example` wird gepflegt. Wenn du neue Variablen einführst, beides aktualisieren.
 

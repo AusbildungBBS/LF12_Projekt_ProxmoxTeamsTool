@@ -28,6 +28,7 @@ services:
     environment:
       AZURE_CLIENT_ID: "${AZURE_CLIENT_ID:-}"
       AZURE_TENANT_ID: "${AZURE_TENANT_ID:-}"
+      AZURE_APP_ID_URI: "${AZURE_APP_ID_URI:-}"
       API_BASE_URL: "${API_BASE_URL:-}"
     ports:
       - "8080:80"

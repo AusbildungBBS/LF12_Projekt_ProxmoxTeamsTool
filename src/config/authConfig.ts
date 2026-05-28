@@ -1,6 +1,10 @@
 import type { Configuration } from "@azure/msal-browser";
 import { LogLevel } from "@azure/msal-browser";
-import { AZURE_CLIENT_ID as CLIENT_ID, AZURE_TENANT_ID as TENANT_ID } from "./runtime";
+import {
+  AZURE_APP_ID_URI,
+  AZURE_CLIENT_ID as CLIENT_ID,
+  AZURE_TENANT_ID as TENANT_ID,
+} from "./runtime";
 
 // Laufzeit-Config (Client-/Tenant-ID, API-Basis) lebt zentral in ./runtime.ts:
 // dort wird window.__APP_CONFIG__ ausgelesen (Container) mit Fallback auf die
@@ -53,7 +57,7 @@ export const msalConfig: Configuration = {
  * The frontend requests a token for THIS scope. The backend then exchanges
  * it via the On-Behalf-Of flow for a Microsoft Graph token.
  */
-const apiScope = `api://${CLIENT_ID}/access_as_user`;
+const apiScope = `${AZURE_APP_ID_URI}/access_as_user`;
 
 /**
  * Scopes for the initial login request.

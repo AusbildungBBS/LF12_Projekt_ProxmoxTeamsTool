@@ -97,20 +97,21 @@ Liegen Frontend und Bridge auf **getrennten Origins** (Frontend auf Azure SWA, B
 
 **Cloudflare-Tunnel.** `cloudflared` (Token-/Remote-Managed-Modus) hängt am Profil `tunnel`, baut nur eine **ausgehende** Verbindung auf und braucht keine eingehenden Ports. Die Public-Hostname-Route (`api.example.org` → `http://bridge:3001`) wird im Cloudflare-Zero-Trust-Dashboard gesetzt, nicht in einer lokalen Config. Token als `CF_TUNNEL_TOKEN` in `.env`. WebSockets (VNC) laufen durch den Tunnel.
 
-> **Azure Static Web Apps (Frontend).** SPA-Routing über [public/staticwebapp.config.json](public/staticwebapp.config.json) (`navigationFallback` → `/index.html`), wird von Vite nach `dist/` emittiert. `VITE_*` (inkl. `VITE_API_BASE_URL`) werden im SWA-Build eingebacken.
+> **Azure Static Web Apps (Frontend).** SPA-Routing über [public/staticwebapp.config.json](public/staticwebapp.config.json) (`navigationFallback` → `/index.html`), wird von Vite nach `dist/` emittiert. `VITE_*` (inkl. `VITE_API_BASE_URL` und optional `VITE_AZURE_APP_ID_URI`) werden im SWA-Build eingebacken.
 
 ---
 
 ## Konfiguration
 
-Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-**Build**-Variablen tragen ein `VITE_`-Prefix; die übrigen liest die Bridge — Ausnahme: der Frontend-Container liest zur Laufzeit zusätzlich `AZURE_CLIENT_ID`, `AZURE_TENANT_ID` und `API_BASE_URL` (ohne Prefix) und schreibt sie in `/config.js`.
+Alle Variablen leben in `.env` (siehe `.env.example`). Frontend-**Build**-Variablen tragen ein `VITE_`-Prefix; die übrigen liest die Bridge — Ausnahme: der Frontend-Container liest zur Laufzeit zusätzlich `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_APP_ID_URI` und `API_BASE_URL` (ohne Prefix) und schreibt sie in `/config.js`.
 
 | Variable | Wofür |
 |---|---|
 | `VITE_AZURE_CLIENT_ID` / `AZURE_CLIENT_ID` | Application (Client) ID der Entra-App |
 | `VITE_AZURE_TENANT_ID` / `AZURE_TENANT_ID` | Tenant ID |
+| `VITE_AZURE_APP_ID_URI` / `AZURE_APP_ID_URI` | Application ID URI für Teams-SSO, z.B. `api://<frontend-host>/<client-id>` |
 | `AZURE_CLIENT_SECRET` | Client Secret (Bridge-seitig für OBO-Token-Exchange) |
-| `API_AUDIENCE` | Erwartete `aud` der eingehenden Tokens (default: `api://<AZURE_CLIENT_ID>`) |
+| `API_AUDIENCE` | Erwartete `aud` der eingehenden Tokens; bei Teams-SSO identisch zu `AZURE_APP_ID_URI` |
 | `AUTH_MODE` | `standard` / `edu` / `auto` (Default). Steuert, ob Rollen + Klassen aus App-Roles + `groups`-Claim (Standard) oder aus Microsoft Education Graph (EDU) kommen. Details: [docs/entra-setup.md](docs/entra-setup.md). |
 | `PROXMOX_URL` / `PROXMOX_TOKEN_ID` / `PROXMOX_TOKEN_SECRET` | Proxmox-Anbindung. Wenn gesetzt: Bridge filtert die `classes`-Liste der Identity gegen die `tpl-class-<oid>`-Tags. Wenn leer: Filter aus (alle Group-Memberships passieren). |
 | `PROXMOX_TLS_REJECT_UNAUTHORIZED` | `false` für Self-Signed-Cert (Dev). Default `true`. |

@@ -46,11 +46,19 @@ Im Entra-Portal die App-Registration oeffnen:
    Localhost-Redirect kannst du dabeilassen (fuer weiter parallel
    `npm run dev`-Entwicklung).
 
-2. Falls Teams Single-Sign-On (SSO innerhalb des Tabs ohne MSAL-Redirect)
-   funktionieren soll, muss zusaetzlich die Application ID URI auch in
-   `/.default` als Pre-Authorized-App fuer Teams hinterlegt werden. Fuer
-   das hier reichende Minimal-Setup (MSAL-Redirect-Flow im Iframe)
-   ignorierbar.
+2. **Expose an API** → Application ID URI muss zum Host passen:
+
+   ```txt
+   api://<dein-tunnel-host>/<client-id>
+   ```
+
+   Dazu den Scope `access_as_user` anlegen und unter **Authorized client
+   applications** die Teams-Clients fuer diesen Scope hinterlegen:
+
+   ```txt
+   1fec8e78-bce4-4aaf-ab1b-5451cc387264  # Teams Desktop/Mobile
+   5e3ce6c0-2b1f-4285-8d4b-75ee78787346  # Teams Web
+   ```
 
 ## Manifest + Icons in ein Sideload-Zip packen
 
@@ -69,7 +77,8 @@ AZURE_CLIENT_ID=05e8c4d6-... \
 Das Script:
 
 - Setzt im `manifest.json` die Platzhalter `{{FRONTEND_HOST}}` und
-  `{{AZURE_CLIENT_ID}}` ein, validiert das JSON.
+  `{{AZURE_CLIENT_ID}}` ein, baut `AZURE_APP_ID_URI` standardmaessig als
+  `api://<frontend-host>/<client-id>` und validiert das JSON.
 - Zippt das mit `color.png` (192×192) und `outline.png` (32×32) auf
   oberster Ebene zu `pttool-teams-app.zip`.
 

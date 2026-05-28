@@ -38,7 +38,7 @@ Schritte 3 und 4 liefern je eine URL, die spätere Schritte brauchen — wer sie
 
 ## 0. Voraussetzungen
 
-- **Entra-App-Registration** fertig ([entra-setup.md](entra-setup.md)): Single-Tenant, `api://<client-id>`, Scope `access_as_user`, `requestedAccessTokenVersion: 2`, App-Roles, Client-Secret, ggf. Groups-Claim.
+- **Entra-App-Registration** fertig ([entra-setup.md](entra-setup.md)): Single-Tenant, `api://<swa-host>/<client-id>` als Application ID URI, Scope `access_as_user`, `requestedAccessTokenVersion: 2`, App-Roles, Client-Secret, ggf. Groups-Claim.
 - **VM** in der Proxmox-Umgebung mit Docker + Docker Compose **v2.20+** (`docker compose version`) und ausgehendem 443 (für den Tunnel). Die VM muss die Proxmox-API erreichen (z. B. `https://<proxmox>:8006`).
 - **Cloudflare-Account** mit einer Domain in einer Zone (für die `api.…`-Subdomain).
 - **Azure-Account** (SWA Free genügt) und ein **GitHub-Repo** (für das SWA-Deployment via Action).
@@ -122,6 +122,7 @@ Diese Repo enthält eine fertige Action: [.github/workflows/azure-static-web-app
 - **Repository Variables** (Settings → Secrets and variables → Actions → *Variables*; öffentlich, daher Variables, nicht Secrets):
   - `VITE_AZURE_CLIENT_ID` = Client-ID
   - `VITE_AZURE_TENANT_ID` = Tenant-GUID
+  - `VITE_AZURE_APP_ID_URI` = `api://<swa-host>/<client-id>` (optional, aber explizit sauber)
   - `VITE_API_BASE_URL` = `https://api.example.org` (aus Schritt 3)
 
 Push auf `main` → die Action baut (`npm ci && npm run build`) mit den `VITE_*`-Werten und deployt `dist/`. Der SWA-Hostname (`https://<name>.azurestaticapps.net`) steht danach im Portal.
@@ -134,6 +135,7 @@ Auf der VM in der `.env`:
 
 ```env
 CORS_ALLOWED_ORIGINS=https://<swa-host>
+API_AUDIENCE=api://<swa-host>/<client-id>
 ```
 
 Mehrere Origins (z. B. `*.azurestaticapps.net` **und** Custom Domain) kommagetrennt. Backend neu starten:
@@ -154,7 +156,7 @@ Entra → App-Registration → **Authentication → Single-page application → 
 FRONTEND_HOST=<swa-host-ohne-https> AZURE_CLIENT_ID=<client-id> bash appPackage/build.sh
 ```
 
-Erzeugt `appPackage/pttool-teams-app.zip` mit `contentUrl`/`validDomains` = SWA-Host ([appPackage/manifest.json](../appPackage/manifest.json)). In Teams hochladen (org-weit über die Teams Admin Console oder per Sideload, [teams-sideload.md](teams-sideload.md)). Bei Updates die `version` in der `manifest.json` erhöhen.
+Erzeugt `appPackage/pttool-teams-app.zip` mit `contentUrl`/`validDomains` = SWA-Host und `webApplicationInfo.resource=api://<swa-host>/<client-id>` ([appPackage/manifest.json](../appPackage/manifest.json)). In Teams hochladen (org-weit über die Teams Admin Console oder per Sideload, [teams-sideload.md](teams-sideload.md)). Bei Updates die `version` in der `manifest.json` erhöhen.
 
 ## 8. Verifikation (Ende-zu-Ende)
 
