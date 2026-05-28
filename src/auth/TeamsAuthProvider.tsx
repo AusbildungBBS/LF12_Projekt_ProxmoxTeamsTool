@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { app, authentication } from "@microsoft/teams-js";
 import {
@@ -44,6 +44,29 @@ function bridgeAuthErrorMessage(status: number, code?: string): string {
   return "Anmeldung konnte nicht abgeschlossen werden. Bitte später erneut versuchen.";
 }
 
+// Dekodiert den Payload eines JWT (ohne Signaturpruefung) — NUR zur Anzeige von
+// Name/Rollen in Teams (dort gibt es kein MSAL-ID-Token). Sicherheit und
+// Autorisierung macht weiterhin die Bridge serverseitig.
+function decodeJwtPayload(
+  token: string | null
+): { name?: string; preferred_username?: string; roles?: string[] } | null {
+  if (!token) return null;
+  const part = token.split(".")[1];
+  if (!part) return null;
+  try {
+    const bin = atob(part.replace(/-/g, "+").replace(/_/g, "/"));
+    const json = decodeURIComponent(
+      bin
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
 // ── Inner Auth Provider (needs MSAL context) ───────────────────────────────────
 
 function AuthProviderInner({ children }: { children: ReactNode }) {
@@ -54,6 +77,12 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   const [identity, setIdentity] = useState<BridgeIdentity | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // In Teams gibt es kein MSAL-Konto/ID-Token: Name/UPN merken wir aus dem
+  // Teams-Kontext, Rollen kommen aus dem dekodierten SSO-Token (siehe unten).
+  const [teamsUser, setTeamsUser] = useState<{
+    displayName?: string;
+    upn?: string;
+  } | null>(null);
   const IMPERSONATE_KEY = "pttool.impersonate";
   const [impersonatedRole, setImpersonatedRoleState] = useState<ImpersonatedRole | null>(
     () => {
@@ -76,12 +105,41 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
   // ist. Sonst bliebe der Teams-Tab dauerhaft im Login-Screen haengen.
   const isAuthenticated = !!user || (isInTeams && !!accessToken);
 
-  // Echte Roles aus ID-Token (immer, ohne Impersonation), damit das Switcher-
-  // UI in der Profile-Bar erkennt ob der User wirklich Admin ist.
+  // In Teams (kein MSAL-ID-Token) dekodieren wir den SSO-Access-Token NUR zur
+  // Anzeige von Rollen/Name — die Autorisierung macht weiterhin die Bridge.
+  const ssoClaims = useMemo(
+    () => (isInTeams ? decodeJwtPayload(accessToken) : null),
+    [isInTeams, accessToken]
+  );
+
+  // Echte Roles aus ID-Token bzw. (in Teams) aus dem SSO-Token, damit das
+  // Switcher-UI in der Profile-Bar erkennt ob der User wirklich Admin ist.
   const idTokenRoles =
-    (user?.idTokenClaims as { roles?: string[] } | undefined)?.roles ?? [];
+    (user?.idTokenClaims as { roles?: string[] } | undefined)?.roles ??
+    ssoClaims?.roles ??
+    [];
   const realRoles = identity?.roles ?? idTokenRoles;
   const realIsAdmin = realRoles.includes(ROLES.ADMIN);
+
+  // Anzeige-Profil-Fallback fuer Teams ohne Bridge (rein abgeleitet, kein
+  // State): Name/UPN aus Teams-Kontext bzw. SSO-Token. Das echte Graph-Profil
+  // (state `profile`, von /api/me) hat im Context-Value Vorrang.
+  const teamsFallbackProfile = useMemo<GraphProfile | null>(() => {
+    if (!isInTeams) return null;
+    const displayName =
+      ssoClaims?.name ||
+      teamsUser?.displayName ||
+      ssoClaims?.preferred_username ||
+      teamsUser?.upn;
+    const upn = teamsUser?.upn || ssoClaims?.preferred_username;
+    if (!displayName && !upn) return null;
+    return {
+      id: "",
+      displayName: displayName || upn || "",
+      mail: upn ?? null,
+      userPrincipalName: upn ?? "",
+    };
+  }, [isInTeams, ssoClaims, teamsUser]);
 
   // Die "gefuehlten" Roles fuer die UI: bei aktiver Impersonation ueberschrieben.
   const roles = impersonatedRole ? [impersonatedRole] : realRoles;
@@ -124,22 +182,13 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         const context = await app.getContext();
         if (context) {
           setIsInTeams(true);
-          // Name/E-Mail aus dem Teams-Kontext als Fallback setzen, damit die
-          // Profilleiste sie auch OHNE Bridge zeigt — in Teams gibt es kein
-          // MSAL-Konto (user ist null), und das echte Graph-Profil kommt sonst
-          // erst von /api/me. Sobald die Bridge antwortet, ueberschreibt deren
-          // Profil diesen Fallback (setProfile in der /api/me-Effect-Logik).
-          const tu = context.user;
-          if (tu) {
-            setProfile((prev) =>
-              prev ?? {
-                id: tu.id ?? "",
-                displayName: tu.displayName ?? tu.userPrincipalName ?? "",
-                mail: tu.userPrincipalName ?? null,
-                userPrincipalName: tu.userPrincipalName ?? "",
-              }
-            );
-          }
+          // Name/UPN aus dem Teams-Kontext merken — dient zusammen mit den
+          // Rollen aus dem SSO-Token als Anzeige-Fallback, falls die Bridge
+          // (die das echte Graph-Profil liefert) gerade aus ist.
+          setTeamsUser({
+            displayName: context.user?.displayName,
+            upn: context.user?.userPrincipalName,
+          });
           // Try Teams SSO
           await teamsSSO();
         }
@@ -311,7 +360,7 @@ function AuthProviderInner({ children }: { children: ReactNode }) {
         isAuthenticated,
         user,
         accessToken,
-        profile,
+        profile: profile ?? teamsFallbackProfile,
         identity,
         roles,
         classes,
