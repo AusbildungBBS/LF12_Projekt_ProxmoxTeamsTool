@@ -41,6 +41,109 @@
   --shadow-8: 0 4px 8px rgba(0, 0, 0, 0.08), 0 0 2px rgba(0, 0, 0, 0.06);
 }
 
+/* ── Dark Mode ────────────────────────────────────────────────────────────────
+ * Aktiv via <html data-theme="dark"> (siehe src/theme.ts: folgt dem Teams-Theme
+ * bzw. der OS-Präferenz). Da das UI fast komplett über die Tokens oben färbt,
+ * reicht hier das Überschreiben der Tokens + ein paar gezielte Anpassungen für
+ * hartkodierte Farben. Konsole + virtuelle Tastatur sind absichtlich IMMER
+ * dunkel und bleiben unverändert.
+ */
+:root[data-theme="dark"] {
+  --primary: #7f85e8;
+  --primary-hover: #9499f0;
+  --primary-active: #6a70d6;
+  --primary-soft: #2e2e45;
+  --primary-soft-hover: #383857;
+
+  --accent: #ff9d4d;
+  --accent-soft: #3a2a16;
+
+  --bg: #1f1f1f;
+  --bg-elevated: #2a2a2a;
+  --border: #3d3d3d;
+  --border-strong: #4d4d4d;
+
+  --text: #e6e6e6;
+  --text-secondary: #adadad;
+  --text-disabled: #6f6f6f;
+
+  --error: #f1707f;
+  --error-soft: #3a2226;
+  --success: #5cc98d;
+  --warning: #e0b250;
+  --warning-soft: #38301a;
+
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, 0.4), 0 0 2px rgba(0, 0, 0, 0.5);
+  --shadow-4: 0 2px 4px rgba(0, 0, 0, 0.45), 0 0 2px rgba(0, 0, 0, 0.5);
+  --shadow-8: 0 4px 12px rgba(0, 0, 0, 0.55), 0 0 2px rgba(0, 0, 0, 0.5);
+
+  color-scheme: dark; /* native Controls (select, checkbox, scrollbar) dunkel */
+}
+
+/* Gezielte Dark-Anpassungen für die wenigen hartkodierten Farben. */
+[data-theme="dark"] .card-meta,
+[data-theme="dark"] .card-desc {
+  color: var(--text-secondary);
+}
+[data-theme="dark"] .admin-grid .card li {
+  border-top-color: var(--border);
+}
+[data-theme="dark"] .card.empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    var(--bg-elevated),
+    var(--bg-elevated) 12px,
+    rgba(255, 255, 255, 0.03) 12px,
+    rgba(255, 255, 255, 0.03) 24px
+  );
+}
+[data-theme="dark"] .dev-auth-banner {
+  background: #3a3320;
+  color: #f0d68a;
+  border-bottom-color: #5a4f2a;
+}
+[data-theme="dark"] .card-actions button {
+  background: var(--bg);
+  border-color: var(--border-strong);
+  color: var(--text);
+}
+[data-theme="dark"] .card-actions button:hover:not(:disabled) {
+  background: var(--border);
+}
+[data-theme="dark"] .card-actions button.danger {
+  background: var(--error-soft);
+  border-color: var(--error);
+  color: var(--error);
+}
+[data-theme="dark"] .card-actions button.danger:hover:not(:disabled) {
+  background: #4a2a2f;
+}
+[data-theme="dark"] .card.error {
+  border-left-color: var(--error);
+  background: var(--error-soft);
+}
+[data-theme="dark"] .card.hint {
+  border-left-color: #4a8;
+  background: #19271f;
+}
+[data-theme="dark"] .card:target {
+  outline-color: var(--primary);
+}
+
+/* Status-/Info-Badges: dunkle Füllung + helle Schrift. */
+[data-theme="dark"] .badge.badge-public,
+[data-theme="dark"] .badge.badge-unclaimed { background: #3d3413; color: #e8cf6a; }
+[data-theme="dark"] .badge.badge-running,
+[data-theme="dark"] .badge.badge-connected { background: #18331f; color: #6fd897; }
+[data-theme="dark"] .badge.badge-stopped,
+[data-theme="dark"] .badge.badge-disconnected,
+[data-theme="dark"] .badge.badge-unknown { background: #353535; color: #b8b8b8; }
+[data-theme="dark"] .badge.badge-paused,
+[data-theme="dark"] .badge.badge-connecting,
+[data-theme="dark"] .badge.badge-impersonate { background: #3d2a16; color: #e0a866; }
+[data-theme="dark"] .badge.badge-error { background: #3a2226; color: #f1707f; }
+[data-theme="dark"] .badge.badge-own { background: #23306a; color: #aebef5; }
+
 /* ── Reset / Basis ────────────────────────────────────────────────────────── */
 
 * {
@@ -739,7 +842,7 @@ a:hover {
   left: 50%;
   transform: translateX(-50%);
   background: var(--text);
-  color: #fff;
+  color: var(--bg-elevated);
   padding: 0.3rem 0.55rem;
   border-radius: 4px;
   font-size: 0.78rem;
