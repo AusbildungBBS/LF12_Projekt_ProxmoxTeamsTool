@@ -39,7 +39,7 @@ Schritte 3 und 4 liefern je eine URL, die spätere Schritte brauchen — wer sie
 ## 0. Voraussetzungen
 
 - **Entra-App-Registration** fertig ([entra-setup.md](entra-setup.md)): Single-Tenant, `api://<swa-host>/<client-id>` als Application ID URI, Scope `access_as_user`, `requestedAccessTokenVersion: 2`, App-Roles, Client-Secret, ggf. Groups-Claim.
-- **VM** in der Proxmox-Umgebung mit Docker + Docker Compose **v2.20+** (`docker compose version`) und ausgehendem 443 (für den Tunnel). Die VM muss die Proxmox-API erreichen (z. B. `https://<proxmox>:8006`).
+- **VM** in der Proxmox-Umgebung mit Docker + Docker Compose **v2.20+** (`docker compose version`) und ausgehendem 443 (für den Tunnel). Die VM muss die Proxmox-API erreichen (z. B. `https://<proxmox>:8006`). VM neu aufsetzen: [proxmox-backend-vm.md](proxmox-backend-vm.md).
 - **Cloudflare-Account** mit einer Domain in einer Zone (für die `api.…`-Subdomain).
 - **Azure-Account** (SWA Free genügt) und ein **GitHub-Repo** (für das SWA-Deployment via Action).
 

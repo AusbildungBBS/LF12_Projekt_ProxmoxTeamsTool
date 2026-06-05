@@ -15,7 +15,7 @@ Die Schritte hängen voneinander ab. Zwei GitHub-Werte entstehen **erst spät**:
 
 ## 0. Voraussetzungen
 
-- Proxmox-VM mit **Docker + Compose v2.20+** und ausgehendem 443; muss die Proxmox-API (`https://<proxmox>:8006`) erreichen.
+- Proxmox-VM mit **Docker + Compose v2.20+** und ausgehendem 443; muss die Proxmox-API (`https://<proxmox>:8006`) erreichen. VM neu aufsetzen: [proxmox-backend-vm.md](proxmox-backend-vm.md).
 - **Cloudflare**-Account mit einer Domain (für die `api.…`-Subdomain), **Azure**-Account (SWA Free reicht), **GitHub**-Repo (für die Deploy-Action).
 - Entra-Admin im Tenant.
 
