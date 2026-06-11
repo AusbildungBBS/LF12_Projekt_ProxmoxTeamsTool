@@ -70,8 +70,9 @@ Beide Tiers sind containerisiert und in **zwei Compose-Dateien** aufgeteilt, plu
 | Datei | Services | Wofür |
 |---|---|---|
 | [docker-compose.backend.yml](docker-compose.backend.yml) | `bridge` (immer) + `cloudflared` (Profil `tunnel`) | Läuft auf der Proxmox-VM. |
+| [docker-compose.backend.traefik.yml](docker-compose.backend.traefik.yml) | `bridge` + `traefik` (Let's Encrypt) | Alternative ohne Tunnel — braucht DNS + Inbound 80/443. |
 | [docker-compose.frontend.yml](docker-compose.frontend.yml) | `frontend` (Vite-Build → nginx) | Nur falls das Frontend in Docker statt auf Azure SWA läuft. |
-| [docker-compose.yml](docker-compose.yml) | `include:` beider | Lokaler Full-Stack (Tunnel aus). Braucht Compose **v2.20+**. |
+| [docker-compose.yml](docker-compose.yml) | `include:` von Backend + Frontend | Lokaler Full-Stack (Tunnel aus). Braucht Compose **v2.20+**. |
 
 ```bash
 # Lokal alles auf einem Host (ohne Tunnel):
@@ -79,6 +80,9 @@ docker compose up --build
 
 # Backend auf der Proxmox-VM, mit Cloudflare-Tunnel (kein offener Inbound-Port):
 docker compose -f docker-compose.backend.yml --profile tunnel up -d --build
+
+# Backend mit Traefik statt Tunnel (DNS + Inbound 80/443 vorhanden):
+docker compose -f docker-compose.backend.traefik.yml up -d --build
 
 # Frontend in Docker (nur ohne SWA):
 docker compose -f docker-compose.frontend.yml up -d --build
@@ -98,6 +102,10 @@ docker compose -f docker-compose.frontend.yml up -d --build
 Liegen Frontend und Bridge auf **getrennten Origins** (Frontend auf Azure SWA, Bridge hinter Cloudflare-Tunnel), wird stattdessen eine absolute Basis gesetzt: `VITE_API_BASE_URL` (Build) bzw. `API_BASE_URL` (Container-Laufzeit) → z.B. `https://api.example.org`. Dann muss die Bridge die Frontend-Origin via `CORS_ALLOWED_ORIGINS` erlauben. Siehe [.env.example](.env.example).
 
 **Cloudflare-Tunnel.** `cloudflared` (Token-/Remote-Managed-Modus) hängt am Profil `tunnel`, baut nur eine **ausgehende** Verbindung auf und braucht keine eingehenden Ports. Die Public-Hostname-Route (`api.example.org` → `http://bridge:3001`) wird im Cloudflare-Zero-Trust-Dashboard gesetzt, nicht in einer lokalen Config. Token als `CF_TUNNEL_TOKEN` in `.env`. WebSockets (VNC) laufen durch den Tunnel.
+
+**Traefik-Variante (ohne Tunnel).** Wo DNS + Inbound 80/443 vorhanden sind (eigener Server statt Schulnetz), übernimmt [docker-compose.backend.traefik.yml](docker-compose.backend.traefik.yml) den Ingress: Traefik v3 terminiert TLS mit automatischen Let's-Encrypt-Zertifikaten, das Routing steckt als Docker-Labels am `bridge`-Service. Benötigt `API_HOSTNAME` + `ACME_EMAIL` in der `.env`. Details: [docs/deployment.md §3b](docs/deployment.md#3b-alternative-traefik-statt-cloudflare-tunnel).
+
+**Fertiges Bridge-Image (GHCR).** Die Action [.github/workflows/ghcr-bridge.yml](.github/workflows/ghcr-bridge.yml) baut bei jedem Push auf `main` das Bridge-Image für **linux/amd64** und pusht es nach `ghcr.io/ausbildungbbs/lf12_projekt_proxmoxteamstool/bridge` (Tags: `latest`, `main`, `sha-<commit>`, bei Git-Tags `vX.Y.Z` auch `X.Y.Z`). Statt auf der VM zu bauen: `BRIDGE_IMAGE=ghcr.io/…/bridge:latest` in die `.env`, dann `docker compose … pull bridge && docker compose … up -d` (ohne `--build`). Einmalig das Package auf **public** stellen, sonst braucht der Pull ein `docker login ghcr.io`.
 
 > **Azure Static Web Apps (Frontend).** SPA-Routing über [public/staticwebapp.config.json](public/staticwebapp.config.json) (`navigationFallback` → `/index.html`), wird von Vite nach `dist/` emittiert. `VITE_*` (inkl. `VITE_API_BASE_URL` und optional `VITE_AZURE_APP_ID_URI`) werden im SWA-Build eingebacken.
 

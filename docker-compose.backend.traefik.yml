@@ -1,0 +1,156 @@
+# ── Backend-Stack: Bridge + Traefik (statt Cloudflare-Tunnel) ────────────────
+# Alternative zu docker-compose.backend.yml für Umgebungen, in denen ein
+# klassischer Reverse-Proxy mit eigenem TLS gewünscht ist. Im Gegensatz zum
+# Tunnel braucht diese Variante:
+#   - einen DNS-Eintrag (API_HOSTNAME), der auf diese VM zeigt, und
+#   - OFFENE Inbound-Ports 80 + 443 (Let's-Encrypt-HTTP-01 + HTTPS).
+# Im Schulnetz ohne Inbound bleibt der Tunnel (docker-compose.backend.yml)
+# die richtige Wahl.
+#
+# Starten (Traefik + Bridge, TLS via Let's Encrypt):
+#   docker compose -f docker-compose.backend.traefik.yml up -d --build
+#
+# Config kommt aus .env (cp .env.backend.example .env). Zusätzlich zu den
+# Bridge-Variablen MÜSSEN hier API_HOSTNAME + ACME_EMAIL gesetzt sein —
+# fehlen sie, bricht Compose beim Parsen mit klarer Meldung ab. Das
+# Runtime-File MUSS `.env` heissen (Auto-Loading füllt die ${…}-Interpolation,
+# env_file die Container-Umgebung — Details: docs/deployment.md).
+#
+# Es läuft ENTWEDER diese Datei ODER docker-compose.backend.yml — nicht beide
+# (gleicher Container-Name pttool-bridge).
+
+services:
+  bridge:
+    build:
+      context: .
+      dockerfile: bridge/Dockerfile
+    # Default: lokal bauen. Alternativ das fertige GHCR-Image ziehen —
+    # BRIDGE_IMAGE in .env setzen (siehe docker-compose.backend.yml).
+    image: ${BRIDGE_IMAGE:-pttool/bridge:dev}
+    container_name: pttool-bridge
+    restart: unless-stopped
+    # Wie in docker-compose.backend.yml: .env füllt die Container-Umgebung
+    # (AZURE_*, PROXMOX_*, CORS_ALLOWED_ORIGINS, …).
+    env_file: .env
+    # Loopback-Publish nur für lokale Smoke-Tests (curl auf der VM). Der
+    # eigentliche Ingress ist Traefik, das die Bridge über das interne
+    # Compose-Netz als `bridge:3001` erreicht — kein LAN-Port nötig.
+    ports:
+      - "${BRIDGE_BIND:-127.0.0.1:3001}:3001"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    # ── Traefik-Routing (Labels statt Dashboard-Route) ──────────────────────
+    # Pendant zur Public-Hostname-Route des Tunnels: alles auf
+    # https://${API_HOSTNAME} geht an bridge:3001. WebSockets (VNC, /ws/*)
+    # proxied Traefik nativ — keine Extra-Config nötig.
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.pttool-bridge.rule: Host(`${API_HOSTNAME:?API_HOSTNAME in .env setzen, z.B. api.example.org}`)
+      traefik.http.routers.pttool-bridge.entrypoints: websecure
+      traefik.http.routers.pttool-bridge.tls.certresolver: letsencrypt
+      traefik.http.services.pttool-bridge.loadbalancer.server.port: "3001"
+    # ── Secrets statt Klartext-Env (empfohlen für Prod) ─────────────────────
+    # Identisch zu docker-compose.backend.yml: jeder Wert auch als <NAME>_FILE.
+    # secrets:
+    #   - azure_client_secret
+    #   - proxmox_token_secret
+    # environment:
+    #   AZURE_CLIENT_SECRET_FILE: /run/secrets/azure_client_secret
+    #   PROXMOX_TOKEN_SECRET_FILE: /run/secrets/proxmox_token_secret
+
+  # ── Traefik ────────────────────────────────────────────────────────────────
+  # Reverse-Proxy + automatisches TLS (Let's Encrypt, HTTP-01). Findet die
+  # Bridge über die Docker-Labels oben (exposedByDefault=false → nur explizit
+  # markierte Container werden geroutet).
+  traefik:
+    # Gepinnt statt :latest — per Renovate/Dependabot nachziehen.
+    image: traefik:v3.5
+    container_name: pttool-traefik
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.websecure.address=:443
+      # Alles von 80 auf 443 umleiten (ACME-HTTP-01 fängt Traefik intern
+      # VOR dem Redirect ab — die Challenge funktioniert trotzdem).
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --certificatesresolvers.letsencrypt.acme.email=${ACME_EMAIL:?ACME_EMAIL in .env setzen (Let's-Encrypt-Kontakt)}
+      - --certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web
+      # Zum Testen erst gegen die Staging-CA (kein Rate-Limit, Cert untrusted);
+      # danach Zeile entfernen + traefik-letsencrypt-Volume löschen:
+      # - --certificatesresolvers.letsencrypt.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+      # /ping-Endpoint für den Healthcheck unten.
+      - --ping=true
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      # Read-only reicht: Traefik liest nur Container-Metadaten (Discovery).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # ACME-Zertifikate überleben Container-Neustarts.
+      - traefik-letsencrypt:/letsencrypt
+    depends_on:
+      bridge:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    # ── Hardening ────────────────────────────────────────────────────────────
+    # read_only + cap_drop wie beim cloudflared-Service; NET_BIND_SERVICE
+    # kommt zurück, damit Traefik 80/443 im Container binden darf.
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  traefik-letsencrypt:
+
+# ── Eigener/bestehender Traefik auf demselben Host? ──────────────────────────
+# Läuft schon ein Traefik (anderes Compose-Projekt), den gebündelten traefik-
+# Service oben einfach NICHT mitstarten — nur die Bridge hochziehen:
+#
+#   docker compose -f docker-compose.backend.traefik.yml \
+#                  -f traefik-extern.override.yml up -d --build bridge
+#
+# und die Bridge per Override ins Proxy-Netz des bestehenden Traefik hängen
+# (traefik-extern.override.yml; ACME_EMAIL braucht dann nur einen Dummy-Wert,
+# die Interpolation prüft die ganze Datei):
+#
+#   services:
+#     bridge:
+#       networks: [default, proxy]
+#       labels:
+#         # Discovery-IP aus dem Proxy-Netz nehmen (Bridge hängt in zweien).
+#         traefik.docker.network: <name-des-proxy-netzes>
+#         # certresolver/entrypoints ggf. an den bestehenden Traefik anpassen.
+#   networks:
+#     proxy:
+#       name: <name-des-proxy-netzes>
+#       external: true
+#
+# Traefik auf einem ANDEREN Host: stattdessen docker-compose.backend.yml ohne
+# Profil nutzen, BRIDGE_BIND=0.0.0.0:3001 setzen und im fremden Traefik einen
+# File-Provider-Service auf http://<vm-ip>:3001 zeigen lassen.
+
+# ── Secrets (optional, für Prod statt Klartext-Env) ─────────────────────────
+# secrets:
+#   azure_client_secret:
+#     file: ./secrets/azure_client_secret
+#   proxmox_token_secret:
+#     file: ./secrets/proxmox_token_secret

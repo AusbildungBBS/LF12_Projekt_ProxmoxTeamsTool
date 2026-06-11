@@ -1,6 +1,6 @@
 # Deployment — Produktivbetrieb
 
-Frontend auf **Azure Static Web Apps** (Free), Bridge auf einer **Docker-VM in der Proxmox-Installation**, erreichbar über einen **Cloudflare-Tunnel**. Kein offener Inbound-Port im Schulnetz.
+Frontend auf **Azure Static Web Apps** (Free), Bridge auf einer **Docker-VM in der Proxmox-Installation**, erreichbar über einen **Cloudflare-Tunnel**. Kein offener Inbound-Port im Schulnetz. Wer stattdessen einen klassischen Reverse-Proxy will (DNS + Inbound 80/443 vorhanden): [Traefik-Variante](#3b-alternative-traefik-statt-cloudflare-tunnel).
 
 > Diese Anleitung orchestriert das Gesamt-Deployment. Die Einzelthemen sind woanders detailliert: Entra → [entra-setup.md](entra-setup.md), Proxmox-Token → [setup.md §8](setup.md), Compose-Mechanik → [README → Docker](../README.md#docker-zwei-tiers-getrennt-deploybar), Teams-Sideload → [teams-sideload.md](teams-sideload.md).
 
@@ -114,9 +114,48 @@ docker compose -f docker-compose.backend.yml --profile tunnel down # stoppen
 
 `--build` nur beim ersten Start bzw. nach Code-Änderungen. **Kein `--env-file`-Flag** — solange das Runtime-File `.env` heißt (siehe Box oben).
 
+> **Ohne lokales Bauen: fertiges Image aus der GHCR.** Die Action [.github/workflows/ghcr-bridge.yml](../.github/workflows/ghcr-bridge.yml) baut bei jedem Push auf `main` ein x64-Image. Auf der VM in der `.env` `BRIDGE_IMAGE=ghcr.io/ausbildungbbs/lf12_projekt_proxmoxteamstool/bridge:latest` setzen, dann:
+>
+> ```bash
+> docker compose -f docker-compose.backend.yml --profile tunnel pull bridge
+> docker compose -f docker-compose.backend.yml --profile tunnel up -d   # ohne --build!
+> ```
+>
+> Updates einspielen = dieselben zwei Befehle erneut. Gilt genauso für die Traefik-Variante (§3b). Voraussetzung: das Package ist in GitHub auf **public** gestellt (einmalig: Repo → Packages → `bridge` → *Package settings* → *Change visibility*), sonst vorher `docker login ghcr.io`.
+
 Smoke-Test: `https://api.example.org/api/health` muss `{"status":"ok",…}` liefern.
 
 Die **API-URL** (`https://api.example.org`) ist ab jetzt der Wert für `VITE_API_BASE_URL` (Schritt 4).
+
+## 3b. Alternative: Traefik statt Cloudflare-Tunnel
+
+Ersetzt **nur Schritt 3** — alles andere (Entra, SWA, CORS, Teams) bleibt identisch, die API-URL ist am Ende dieselbe. Statt des Tunnels terminiert ein mitgelieferter **Traefik** (v3) TLS direkt auf der VM, Zertifikate kommen automatisch von **Let's Encrypt**. Compose-Datei: [docker-compose.backend.traefik.yml](../docker-compose.backend.traefik.yml).
+
+**Zusätzliche Voraussetzungen** (das, was der Tunnel sonst wegabstrahiert):
+
+- Ein **DNS-A/AAAA-Record** (z. B. `api.example.org`) zeigt auf die VM bzw. auf eine öffentliche IP, die zu ihr NATtet.
+- **Inbound 80 + 443** erreichen die VM (80 für die Let's-Encrypt-HTTP-01-Challenge, 443 für den eigentlichen Traffic). Im Schulnetz ohne Portfreigabe scheidet das aus → Tunnel nehmen.
+
+In der `.env` zusätzlich (beide Pflicht für diese Variante):
+
+```env
+API_HOSTNAME=api.example.org
+ACME_EMAIL=admin@example.org
+```
+
+Starten (kein Profil nötig — die Datei ist die Traefik-Variante):
+
+```bash
+docker compose -f docker-compose.backend.traefik.yml up -d --build
+docker compose -f docker-compose.backend.traefik.yml ps        # bridge + traefik healthy
+docker compose -f docker-compose.backend.traefik.yml logs -f traefik
+```
+
+Das Routing (`Host(api.example.org) → bridge:3001`) steckt als Docker-Labels am `bridge`-Service — das Pendant zur Public-Hostname-Route des Tunnels, nur eben im Repo statt im Cloudflare-Dashboard. WebSockets (VNC) proxied Traefik ohne Zusatzconfig. HTTP wird auf HTTPS umgeleitet, die Zertifikate liegen im Volume `traefik-letsencrypt` und erneuern sich automatisch.
+
+> **Nicht beide Varianten gleichzeitig** starten (gleicher Container-Name `pttool-bridge`). Zum Testen ohne Let's-Encrypt-Rate-Limit zuerst die auskommentierte Staging-CA-Zeile in der Compose-Datei aktivieren. Läuft auf dem Host **schon ein Traefik**, nicht den gebündelten mitstarten — Anleitung im Kommentarblock am Ende der Compose-Datei.
+
+Smoke-Test wie in Schritt 3: `https://api.example.org/api/health` → `{"status":"ok",…}`. Weiter mit Schritt 4.
 
 ## 4. Frontend auf Azure Static Web Apps
 

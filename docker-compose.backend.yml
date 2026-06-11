@@ -18,7 +18,12 @@ services:
     build:
       context: .
       dockerfile: bridge/Dockerfile
-    image: pttool/bridge:dev
+    # Default: lokal bauen (pttool/bridge:dev). Alternativ das fertige Image
+    # aus der GHCR ziehen (baut die Action .github/workflows/ghcr-bridge.yml):
+    #   BRIDGE_IMAGE=ghcr.io/ausbildungbbs/lf12_projekt_proxmoxteamstool/bridge:latest
+    # in .env setzen, dann `docker compose ... pull bridge && ... up -d`
+    # (ohne --build — sonst wird das GHCR-Tag lokal ueberschrieben).
+    image: ${BRIDGE_IMAGE:-pttool/bridge:dev}
     container_name: pttool-bridge
     restart: unless-stopped
     # Config aus .env. WICHTIG: genau `.env` (nicht .env.backend o.ae.), denn
