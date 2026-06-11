@@ -121,7 +121,7 @@ docker compose -f docker-compose.backend.yml --profile tunnel down # stoppen
 > docker compose -f docker-compose.backend.yml --profile tunnel up -d   # ohne --build!
 > ```
 >
-> Updates einspielen = dieselben zwei Befehle erneut. Gilt genauso für die Traefik-Variante (§3b). Voraussetzung: das Package ist in GitHub auf **public** gestellt (einmalig: Repo → Packages → `bridge` → *Package settings* → *Change visibility*), sonst vorher `docker login ghcr.io`.
+> Updates einspielen = dieselben zwei Befehle erneut. Die Traefik-Variante (§3b) nutzt das GHCR-Image bereits **standardmäßig** (dort kein `BRIDGE_IMAGE` nötig). Voraussetzung: das Package ist in GitHub auf **public** gestellt (einmalig: Repo → Packages → `bridge` → *Package settings* → *Change visibility*), sonst vorher `docker login ghcr.io`.
 
 Smoke-Test: `https://api.example.org/api/health` muss `{"status":"ok",…}` liefern.
 
@@ -143,12 +143,14 @@ API_HOSTNAME=api.example.org
 ACME_EMAIL=admin@example.org
 ```
 
-Starten (kein Profil nötig — die Datei ist die Traefik-Variante):
+Starten (kein Profil nötig — die Datei ist die Traefik-Variante). Das Bridge-Image wird **nicht lokal gebaut**, sondern fertig aus der GHCR gepullt (solange das Package nicht public ist: vorher `docker login ghcr.io`; eigener Fork: `BRIDGE_IMAGE` in der `.env` auf die eigene Registry zeigen):
 
 ```bash
-docker compose -f docker-compose.backend.traefik.yml up -d --build
+docker compose -f docker-compose.backend.traefik.yml up -d
 docker compose -f docker-compose.backend.traefik.yml ps        # bridge + traefik healthy
 docker compose -f docker-compose.backend.traefik.yml logs -f traefik
+# Update auf den neuesten Stand:
+docker compose -f docker-compose.backend.traefik.yml pull bridge && docker compose -f docker-compose.backend.traefik.yml up -d
 ```
 
 Das Routing (`Host(api.example.org) → bridge:3001`) steckt als Docker-Labels am `bridge`-Service — das Pendant zur Public-Hostname-Route des Tunnels, nur eben im Repo statt im Cloudflare-Dashboard. WebSockets (VNC) proxied Traefik ohne Zusatzconfig. HTTP wird auf HTTPS umgeleitet, die Zertifikate liegen im Volume `traefik-letsencrypt` und erneuern sich automatisch.

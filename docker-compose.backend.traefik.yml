@@ -7,8 +7,10 @@
 # Im Schulnetz ohne Inbound bleibt der Tunnel (docker-compose.backend.yml)
 # die richtige Wahl.
 #
-# Starten (Traefik + Bridge, TLS via Let's Encrypt):
-#   docker compose -f docker-compose.backend.traefik.yml up -d --build
+# Starten (Traefik + Bridge, TLS via Let's Encrypt; das Bridge-Image kommt
+# fertig gebaut aus der GHCR — kein --build):
+#   docker compose -f docker-compose.backend.traefik.yml up -d
+# Updates: ... pull bridge && ... up -d
 #
 # Config kommt aus .env (cp .env.backend.example .env). Zusätzlich zu den
 # Bridge-Variablen MÜSSEN hier API_HOSTNAME + ACME_EMAIL gesetzt sein —
@@ -21,12 +23,14 @@
 
 services:
   bridge:
-    build:
-      context: .
-      dockerfile: bridge/Dockerfile
-    # Default: lokal bauen. Alternativ das fertige GHCR-Image ziehen —
-    # BRIDGE_IMAGE in .env setzen (siehe docker-compose.backend.yml).
-    image: ${BRIDGE_IMAGE:-pttool/bridge:dev}
+    # Bewusst KEIN build: — diese Variante zieht das fertige x64-Image aus der
+    # GHCR (baut die Action .github/workflows/ghcr-bridge.yml bei jedem Push
+    # auf main). Solange das Package nicht public ist, vorher einmal
+    # `docker login ghcr.io`. Eigener Fork? BRIDGE_IMAGE in .env auf die
+    # eigene Registry zeigen lassen. Doch lokal bauen:
+    #   docker compose -f docker-compose.backend.yml build bridge
+    # und BRIDGE_IMAGE=pttool/bridge:dev setzen.
+    image: ${BRIDGE_IMAGE:-ghcr.io/ausbildungbbs/lf12_projekt_proxmoxteamstool/bridge:latest}
     container_name: pttool-bridge
     restart: unless-stopped
     # Wie in docker-compose.backend.yml: .env füllt die Container-Umgebung
@@ -126,7 +130,7 @@ volumes:
 # Service oben einfach NICHT mitstarten — nur die Bridge hochziehen:
 #
 #   docker compose -f docker-compose.backend.traefik.yml \
-#                  -f traefik-extern.override.yml up -d --build bridge
+#                  -f traefik-extern.override.yml up -d bridge
 #
 # und die Bridge per Override ins Proxy-Netz des bestehenden Traefik hängen
 # (traefik-extern.override.yml; ACME_EMAIL braucht dann nur einen Dummy-Wert,
